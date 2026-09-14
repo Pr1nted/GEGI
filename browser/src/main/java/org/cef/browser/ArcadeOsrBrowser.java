@@ -107,10 +107,21 @@ public final class ArcadeOsrBrowser extends CefBrowser_N implements CefRenderHan
         }
     }
 
+    /**
+     * Minecraft reports scrolling up as positive, and AWT's rotation is negative for up.
+     * java-cef's macOS side flips the rotation once more on its way to Chromium, so there
+     * the sign goes through unchanged (HelperSmoke checks the direction on every OS).
+     */
+    private static final boolean MAC = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("mac");
+
+    /** Scroll left over from fractions of a notch, which trackpads send many of. */
+    private double pendingWheel;
+
     public void wheel(int x, int y, double deltaY, int glfwModifiers) {
-        // Minecraft reports scrolling up as positive; AWT's rotation is negative for up.
-        int rotation = (int) Math.round(-deltaY);
+        pendingWheel += MAC ? deltaY : -deltaY;
+        int rotation = (int) pendingWheel;
         if (rotation == 0) return;
+        pendingWheel -= rotation;
         sendMouseWheelEvent(new MouseWheelEvent(EVENT_SOURCE, MouseEvent.MOUSE_WHEEL, System.currentTimeMillis(),
                 AwtKeys.modifiers(glfwModifiers), x, y, 0, false, MouseWheelEvent.WHEEL_UNIT_SCROLL, 3, rotation));
     }

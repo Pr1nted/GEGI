@@ -40,6 +40,7 @@ public final class HelperSmoke {
             + "document.addEventListener('keydown',function(e){document.title='key '+e.keyCode;if(e.keyCode===65){document.body.style.background='#0000ff';}});"
             + "document.getElementById('box').addEventListener('input',function(e){document.title='typed '+e.target.value;});"
             + "window.addEventListener('resize',function(){document.title='size '+innerWidth+'x'+innerHeight;});"
+            + "var wheels=0;document.addEventListener('wheel',function(e){wheels++;document.title='wheel '+(e.deltaY>0?'down':'up')+' '+wheels;});"
             + "</script></body></html>";
 
     private static final List<String> events = new CopyOnWriteArrayList<>();
@@ -119,6 +120,17 @@ public final class HelperSmoke {
             send(commands, BrowserProtocol.KEY_DOWN + " 263 0 331");
             send(commands, BrowserProtocol.KEY_UP + " 263 0 331");
             expect("an arrow key reaches the page as keyCode 37", 20, () -> events.contains(BrowserProtocol.TITLE + " key 37"), helper);
+
+            // Minecraft's wheel deltas: positive is up, as GLFW reports it. A page must see the same direction.
+            send(commands, BrowserProtocol.WHEEL + " 400 300 0 -1");
+            expect("scrolling down (delta -1) reaches the page as a wheel down", 20, () -> events.contains(BrowserProtocol.TITLE + " wheel down 1"), helper);
+            send(commands, BrowserProtocol.WHEEL + " 400 300 0 1");
+            expect("scrolling up (delta 1) reaches the page as a wheel up", 20, () -> events.contains(BrowserProtocol.TITLE + " wheel up 2"), helper);
+            // A trackpad sends fractions of a notch: three of 0.4 must still scroll.
+            send(commands, BrowserProtocol.WHEEL + " 400 300 0 -0.4");
+            send(commands, BrowserProtocol.WHEEL + " 400 300 0 -0.4");
+            send(commands, BrowserProtocol.WHEEL + " 400 300 0 -0.4");
+            expect("small trackpad deltas add up to a wheel down", 20, () -> events.contains(BrowserProtocol.TITLE + " wheel down 3"), helper);
 
             send(commands, BrowserProtocol.RESIZE + " 640 480");
             expect("a resize reaches the page", 20, () -> events.contains(BrowserProtocol.TITLE + " size 640x480"), helper);
