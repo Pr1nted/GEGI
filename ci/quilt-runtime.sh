@@ -27,16 +27,16 @@ hmc.exit.on.failed.command=true
 hmc.assets.dummy=true
 EOF
 
-curl -fsSL --retry 5 --retry-all-errors --retry-delay 10 -o headlessmc-launcher.jar \
+curl -fsSL --retry 8 --retry-all-errors --retry-delay 20 -o headlessmc-launcher.jar \
   "https://github.com/3arthqu4ke/headlessmc/releases/download/${HMC_VERSION}/headlessmc-launcher-${HMC_VERSION}.jar"
 
 if [ ! -f "$MCDIR/versions/$MC/$MC.json" ]; then
   java -jar headlessmc-launcher.jar --command download "$MC"
 fi
 
-QUILT_INSTALLER=$(curl -fsSL --retry 5 --retry-all-errors --retry-delay 10 https://maven.quiltmc.org/repository/release/org/quiltmc/quilt-installer/maven-metadata.xml \
+QUILT_INSTALLER=$(curl -fsSL --retry 8 --retry-all-errors --retry-delay 20 https://maven.quiltmc.org/repository/release/org/quiltmc/quilt-installer/maven-metadata.xml \
   | sed -n 's:.*<release>\(.*\)</release>.*:\1:p')
-curl -fsSL --retry 5 --retry-all-errors --retry-delay 10 -o quilt-installer.jar \
+curl -fsSL --retry 8 --retry-all-errors --retry-delay 20 -o quilt-installer.jar \
   "https://maven.quiltmc.org/repository/release/org/quiltmc/quilt-installer/${QUILT_INSTALLER}/quilt-installer-${QUILT_INSTALLER}.jar"
 # The installer needs Java 17 or newer, and versions before 1.18 play on an older one: it
 # runs on the runner's own newer Java (GitHub's Ubuntu image has 21 and 17), the game
@@ -53,7 +53,7 @@ ls "$MCDIR/versions"
 
 # MC-Runtime-Test has no build for 1.13 to 1.15; there the mod's self-test makes its own
 # world and quits the game (OPENARCADE_SELFTEST_CREATE_WORLD).
-if ! curl -fsSL --retry 5 --retry-all-errors --retry-delay 10 -o "run/mods/mc-runtime-test-${MC}-${MCRT_VERSION}-fabric-release.jar" \
+if ! curl -fsSL --retry 8 --retry-all-errors --retry-delay 20 -o "run/mods/mc-runtime-test-${MC}-${MCRT_VERSION}-fabric-release.jar" \
   "https://github.com/headlesshq/mc-runtime-test/releases/download/${MCRT_VERSION}/mc-runtime-test-${MC}-${MCRT_VERSION}-fabric-release.jar"; then
   rm -f "run/mods/mc-runtime-test-${MC}-${MCRT_VERSION}-fabric-release.jar"
   export OPENARCADE_SELFTEST_CREATE_WORLD=1
