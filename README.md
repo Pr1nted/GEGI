@@ -178,6 +178,13 @@ variables (`MODRINTH_MOD_ID`, `MODRINTH_PLUGIN_ID`, `CURSEFORGE_MOD_ID`,
 `BUKKIT_PLUGIN_ID`); a site without its ID is skipped. `publish.py plan --jars <dir>`
 shows what would be uploaded, with no token.
 
+Modrinth asks every mod version where it runs (client-only, server-only, both, ...) and
+will not review a project while any version leaves that unanswered. The answer lives on
+each version and an upload cannot send it, so the release sets it on every version right
+after the jars are up. The `Modrinth environment` workflow does the same from the same
+token without a release; `publish.py environment` does it locally. GEGI's mod is
+client-only: every `fabric.mod.json` says `"environment": "client"`.
+
 ## License
 
 MIT. See [LICENSE](LICENSE).

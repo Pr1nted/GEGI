@@ -1,0 +1,21 @@
+name: Modrinth environment
+
+# Modrinth asks every mod version where it runs and refuses to review a project
+# while any version leaves that unanswered. An upload cannot send the answer, so
+# this sets it on every version from the token already in the repository, with
+# no release and no jars. Run it once, or again if the answer ever changes.
+on:
+  workflow_dispatch:
+
+jobs:
+  environment:
+    if: ${{ vars.MODRINTH_MOD_ID != '' || vars.MODRINTH_PLUGIN_ID != '' }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Declare the environment on Modrinth
+        env:
+          MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
+          MODRINTH_MOD_ID: ${{ vars.MODRINTH_MOD_ID }}
+          MODRINTH_PLUGIN_ID: ${{ vars.MODRINTH_PLUGIN_ID }}
+        run: python3 ci/release/publish.py environment

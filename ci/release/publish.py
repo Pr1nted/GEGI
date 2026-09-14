@@ -240,6 +240,40 @@ def modrinth_unknown(uploads, game_versions, loaders):
     return sorted(set(problems))
 
 
+# Modrinth asks every mod version where it runs, and will not review a project
+# while any version leaves that unanswered. The answer lives on each VERSION
+# (Modrinth's v3 "environment" field, which v2 has no way to send with an
+# upload), so it is set after the jars are up, on every version the project has.
+# Every fabric.mod.json says "environment": "client" and every mods.toml says
+# side = "CLIENT", so the mod is client-only. Modrinth does not ask plugins.
+MODRINTH_API_V3 = re.sub(r"/v2/?$", "/v3", MODRINTH_API)
+MODRINTH_ENVIRONMENT = {
+    "mod": "client_only",
+    "plugin": None,
+}
+
+
+def modrinth_environment(label, info, auth):
+    """Declare where every version of the project runs, where it does not say so already."""
+    want = MODRINTH_ENVIRONMENT[label]
+    if not want:
+        summary(f"- environment: Modrinth does not ask {label} projects for one")
+        return
+    versions = request("GET", f"{MODRINTH_API_V3}/project/{info['id']}/version", headers=auth) or []
+    changed = 0
+    for v in versions:
+        if v.get("environment") == want:
+            continue
+        request("PATCH", f"{MODRINTH_API_V3}/version/{v['id']}", headers=auth,
+                body=json.dumps({"environment": want}).encode("utf-8"), content_type="application/json")
+        changed += 1
+    after = request("GET", f"{MODRINTH_API_V3}/project/{info['id']}/version", headers=auth) or []
+    missing = sorted(v.get("version_number", v["id"]) for v in after if v.get("environment") != want)
+    if missing:
+        fail(f"Modrinth still lists these versions without the {want} environment: {', '.join(missing)}")
+    summary(f"- environment {want} on all {len(after)} versions ({changed} changed)")
+
+
 def modrinth(uploads, tag, version):
     token = env("MODRINTH_TOKEN")
     auth = {"Authorization": token}
@@ -296,6 +330,7 @@ def modrinth(uploads, tag, version):
                 else:
                     created = {"id": "(created on the first try)"}
             summary(f"- {u.version_number()}: uploaded ({', '.join(u.loaders())}; {u.minecraft}) as {created.get('id')}")
+        modrinth_environment(label, info, auth)
 
 
 # ---- CurseForge (and dev.bukkit.org, which runs the same upload API)
@@ -374,6 +409,8 @@ def curseforge(uploads, tag, version):
 
 def plan(uploads, tag):
     game_versions, loaders = modrinth_tags()
+    for label, want in MODRINTH_ENVIRONMENT.items():
+        summary(f"Modrinth {label} environment: {want or 'not asked'}")
     summary("| Jar | Modrinth project | Version number | Loaders | Minecraft |")
     summary("|---|---|---|---|---|")
     for u in uploads:
@@ -388,10 +425,30 @@ def plan(uploads, tag):
     return 1 if problems else 0
 
 
+def environment_only():
+    """Set just the environment of every version, without uploading anything."""
+    token = env("MODRINTH_TOKEN")
+    auth = {"Authorization": token}
+    done = 0
+    for label, variable in (("mod", "MODRINTH_MOD_ID"), ("plugin", "MODRINTH_PLUGIN_ID")):
+        project = env(variable, required=False)
+        if not project:
+            summary(f"Modrinth {label}: {variable} is not set, skipped")
+            continue
+        info = request("GET", f"{MODRINTH_API}/project/{project}", headers=auth)
+        summary(f"### Modrinth {label}: {info.get('title', info['id'])}")
+        modrinth_environment(label, info, auth)
+        done += 1
+    if not done:
+        fail("neither MODRINTH_MOD_ID nor MODRINTH_PLUGIN_ID is set")
+    return 0
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("check").add_argument("tag")
+    sub.add_parser("environment")
     for name in ("plan", "modrinth", "curseforge"):
         p = sub.add_parser(name)
         p.add_argument("--jars", required=True)
@@ -400,6 +457,8 @@ def main():
     if args.command == "check":
         check(args.tag)
         return 0
+    if args.command == "environment":
+        return environment_only()
     version = check(args.tag) if args.tag else None
     uploads = find_jars(args.jars, version)
     if args.command == "plan":
