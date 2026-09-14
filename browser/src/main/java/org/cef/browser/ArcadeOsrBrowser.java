@@ -107,18 +107,18 @@ public final class ArcadeOsrBrowser extends CefBrowser_N implements CefRenderHan
         }
     }
 
-    /**
-     * Minecraft reports scrolling up as positive, and AWT's rotation is negative for up.
-     * java-cef's macOS side flips the rotation once more on its way to Chromium, so there
-     * the sign goes through unchanged (HelperSmoke checks the direction on every OS).
+    /*
+     * Minecraft reports scrolling up as positive, and AWT's rotation is negative for up,
+     * but java-cef flips the rotation once more on its way to Chromium, on every OS: a
+     * negated delta scrolled pages backwards on macOS, Linux and Windows alike. So
+     * Minecraft's sign goes through unchanged. HelperSmoke checks the direction on each.
      */
-    private static final boolean MAC = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("mac");
 
     /** Scroll left over from fractions of a notch, which trackpads send many of. */
     private double pendingWheel;
 
     public void wheel(int x, int y, double deltaY, int glfwModifiers) {
-        pendingWheel += MAC ? deltaY : -deltaY;
+        pendingWheel += deltaY;
         int rotation = (int) pendingWheel;
         if (rotation == 0) return;
         pendingWheel -= rotation;
