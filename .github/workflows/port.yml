@@ -1,0 +1,114 @@
+# Ports Open Arcade to each new Minecraft release, tested before anyone sees it.
+#
+# Every day: is there a release newer than the newest versions/<minecraft>, with its
+# loaders out? If so, ci/port/port.py copies the newest port and moves it to the new
+# game on a branch port/<minecraft>, and the full CI runs on that branch: every loader
+# built and started as a real client with the in-game self-test.
+#
+#   green  a pull request, for a person to merge
+#   red    an issue linking the run and the branch, which has the port so far
+#
+# One version per run, so two releases a day apart are two separate pull requests.
+# A version with a port/<minecraft> branch already is skipped: its PR or issue exists.
+name: Port
+
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: port
+  cancel-in-progress: false
+
+jobs:
+  detect:
+    runs-on: ubuntu-24.04
+    outputs:
+      minecraft: ${{ steps.detect.outputs.minecraft }}
+      from: ${{ steps.detect.outputs.from }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: detect
+        run: |
+          python3 ci/port/versions.py pending versions > pending.json
+          cat pending.json
+          python3 - <<'EOF' >> "$GITHUB_OUTPUT"
+          import json, subprocess
+          for port in json.load(open("pending.json")):
+              mc = port["minecraft_version"]
+              if not port["ready"]:
+                  print(f"# {mc}: loaders not out yet", flush=True)
+                  continue
+              branch = subprocess.run(["git", "ls-remote", "--heads", "origin", f"port/{mc}"], capture_output=True, text=True).stdout
+              if branch.strip():
+                  continue
+              print(f"minecraft={mc}")
+              print(f"from={port['from']}")
+              break
+          EOF
+
+  prepare:
+    needs: detect
+    if: needs.detect.outputs.minecraft != ''
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Port ${{ needs.detect.outputs.from }} to ${{ needs.detect.outputs.minecraft }}
+        run: python3 ci/port/port.py "${{ needs.detect.outputs.from }}" "${{ needs.detect.outputs.minecraft }}" --summary summary.md
+      - name: Push port/${{ needs.detect.outputs.minecraft }}
+        env:
+          MC: ${{ needs.detect.outputs.minecraft }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "port/$MC"
+          git add "versions/$MC"
+          git commit -m "Port to Minecraft $MC" -F summary.md
+          git push origin "port/$MC"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: port-summary
+          path: summary.md
+
+  test:
+    needs: [detect, prepare]
+    uses: ./.github/workflows/ci.yml
+    with:
+      minecraft: ${{ needs.detect.outputs.minecraft }}
+      ref: port/${{ needs.detect.outputs.minecraft }}
+
+  report:
+    needs: [detect, prepare, test]
+    if: always() && needs.prepare.result == 'success'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v5
+        with:
+          name: port-summary
+      - name: Open a pull request, or an issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          MC: ${{ needs.detect.outputs.minecraft }}
+          RESULT: ${{ needs.test.result }}
+          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ "$RESULT" = "success" ]; then
+            printf '\nTested in %s.\n' "$RUN" >> summary.md
+            gh pr create --base main --head "port/$MC" --title "Port to Minecraft $MC" --body-file summary.md
+          else
+            {
+              echo "The automatic port to Minecraft $MC did not pass CI ($RESULT): $RUN"
+              echo
+              echo "The branch \`port/$MC\` has the port so far. The failing jobs say what changed in Minecraft's API."
+              echo
+              cat summary.md
+            } > issue.md
+            gh issue create --title "Port to Minecraft $MC needs work" --body-file issue.md
+          fi

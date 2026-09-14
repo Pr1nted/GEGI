@@ -70,7 +70,8 @@ tasks.register('smokeTest', JavaExec) {
     classpath = sourceSets.smoke.runtimeClasspath
     mainClass = 'net.pr1nted.openarcade.browser.HelperSmoke'
     if (project.hasProperty('smokeJavaHome')) {
-        executable = new File(project.property('smokeJavaHome') as String, 'bin/java').absolutePath
+        def windows = System.getProperty('os.name').toLowerCase().contains('win')
+        executable = new File(project.property('smokeJavaHome') as String, windows ? 'bin/java.exe' : 'bin/java').absolutePath
     } else {
         javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(java_version) }
     }

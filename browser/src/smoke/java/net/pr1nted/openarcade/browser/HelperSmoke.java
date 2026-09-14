@@ -58,7 +58,8 @@ public final class HelperSmoke {
 
         // The same command line BrowserRuntime builds.
         List<String> cmd = new ArrayList<>();
-        cmd.add(new File(System.getProperty("java.home"), "bin/java").getAbsolutePath());
+        boolean windows = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
+        cmd.add(new File(System.getProperty("java.home"), windows ? "bin/java.exe" : "bin/java").getAbsolutePath());
         if (!System.getProperty("java.specification.version").startsWith("1.")) {
             for (String pkg : new String[]{"sun.awt", "sun.lwawt", "sun.lwawt.macosx", "java.awt", "java.awt.peer", "java.awt.event"}) {
                 cmd.add("--add-opens");

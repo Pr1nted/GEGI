@@ -122,6 +122,15 @@ does not happen fails the job.
   resize each reach it and come back as a frame. CI runs it on Linux (Java 8 and 25),
   Windows and macOS.
 
+## New Minecraft versions
+
+`.github/workflows/port.yml` checks every day for a Minecraft release newer than the
+newest `versions/<minecraft>`. Once its loaders are out, `ci/port/port.py` copies the
+newest port and moves it to the new game (loader versions, Java, Gradle, Loom,
+ModDevGradle, and everywhere the version is written down) on a branch
+`port/<minecraft>`, and the whole CI runs on it, real clients and self-test included.
+A green run opens a pull request; a red one opens an issue that links the failing jobs.
+
 ## License
 
 MIT. See [LICENSE](LICENSE).
