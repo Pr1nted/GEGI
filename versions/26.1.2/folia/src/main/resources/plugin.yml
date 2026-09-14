@@ -1,0 +1,11 @@
+name: OpenArcade
+version: '${version}'
+main: net.pr1nted.openarcade.folia.OpenArcadePlugin
+api-version: '26.1.2'
+folia-supported: true
+author: Pr1nted
+description: '${description}'
+commands:
+  arcade:
+    description: Lists web games you can open, starting with Open Doctrines.
+    aliases: [openarcade]

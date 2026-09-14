@@ -28,3 +28,6 @@ folia-server
 HeadlessMC
 headlessmc-launcher.jar
 quilt-installer.jar
+
+# python
+__pycache__

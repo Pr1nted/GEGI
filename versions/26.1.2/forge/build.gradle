@@ -1,0 +1,38 @@
+plugins {
+    id 'multiloader-loader'
+    id 'net.minecraftforge.gradle'
+}
+
+minecraft {
+    runs {
+        configureEach {
+            workingDir = layout.projectDirectory.dir('runs/client')
+        }
+        register('client')
+        register('server') {
+            workingDir = layout.projectDirectory.dir('runs/server')
+            args '--nogui'
+        }
+    }
+}
+
+repositories {
+    minecraft.mavenizer(it)
+    maven fg.forgeMaven
+    maven fg.minecraftLibsMaven
+    mavenCentral()
+}
+
+dependencies {
+    implementation minecraft.dependency("net.minecraftforge:forge:${minecraft_version}-${forge_version}")
+    annotationProcessor 'net.minecraftforge:eventbus-validator:7.0.5'
+}
+
+// Forge 26.2 still ships Mixin 0.8.7, whose newest compatibility level is JAVA_21:
+// it refuses the common config's JAVA_25 at launch. Forge gets the same mixins under
+// its own config; Fabric's and NeoForge's Mixin read the common one.
+jar {
+    manifest {
+        attributes['MixinConfigs'] = "${mod_id}.forge.mixins.json,${mod_id}.ci.mixins.json"
+    }
+}
