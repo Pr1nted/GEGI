@@ -75,6 +75,9 @@ final class SelfTest {
                         if (recommended.isEmpty() || !recommended.get(0).title().equals("Open Doctrines")) {
                             fail("Open Doctrines is not the first recommendation");
                         }
+                        if (!Lang.string("openarcade.title").equals("Open Arcade")) {
+                            fail("the mod's strings did not load: " + Lang.string("openarcade.title"));
+                        }
                         Constants.LOG.info("[self-test] in a world; typing /arcade");
                         next(Step.TYPE_COMMAND);
                     }
@@ -84,8 +87,11 @@ final class SelfTest {
                     next(Step.MENU_FROM_COMMAND);
                 }
                 case MENU_FROM_COMMAND -> {
-                    if (screen instanceof ArcadeScreen arcade && arcade.framesDrawn() >= 5) {
-                        Constants.LOG.info("[self-test] /arcade opened the menu; opening Options");
+                    // The Open Doctrines card must have its picture: without it, the bundled
+                    // texture failed to load, which is what a raw magenta square looked like.
+                    if (screen instanceof ArcadeScreen arcade && arcade.framesDrawn() >= 5
+                            && BundledImages.isReady(ArcadeClient.catalog().recommended().get(0).bundledImage().orElse(""))) {
+                        Constants.LOG.info("[self-test] /arcade opened the menu with Open Doctrines' card; opening Options");
                         next(Step.OPEN_OPTIONS);
                     }
                 }

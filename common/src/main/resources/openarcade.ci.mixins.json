@@ -2,10 +2,8 @@
   "required": false,
   "minVersion": "0.8",
   "package": "net.pr1nted.openarcade.mixin.compat",
+  "plugin": "net.pr1nted.openarcade.client.CiMixinPlugin",
   "compatibilityLevel": "JAVA_21",
-  "client": [
-    "McRuntimeTestMixin"
-  ],
   "injectors": {
     "defaultRequire": 0
   }

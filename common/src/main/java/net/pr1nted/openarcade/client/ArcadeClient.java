@@ -62,6 +62,7 @@ public final class ArcadeClient {
             open(null);
         }
         SelfTest.tick(minecraft);
+        DevScreenshot.tick(minecraft);
     }
 
     /** Opens a game in the player's browser. Anything outside itch.io and Newgrounds is refused. */

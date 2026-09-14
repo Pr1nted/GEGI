@@ -9,7 +9,6 @@ import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
 import net.pr1nted.openarcade.catalog.Catalog;
 import net.pr1nted.openarcade.catalog.GameEntry;
 import net.pr1nted.openarcade.catalog.Links;
@@ -59,7 +58,7 @@ public final class ArcadeScreen extends Screen {
     private int framesDrawn;
 
     public ArcadeScreen(@Nullable Screen parent, Catalog catalog) {
-        super(Component.translatable("openarcade.title"));
+        super(Lang.text("openarcade.title"));
         this.parent = parent;
         this.catalog = catalog;
         for (Catalog.SiteLink site : catalog.sites()) {
@@ -69,6 +68,11 @@ public final class ArcadeScreen extends Screen {
 
     public @Nullable Screen parent() {
         return parent;
+    }
+
+    /** Thumbnails downloaded and on the GPU; the dev screenshot waits for a few. */
+    int thumbnailsReady() {
+        return thumbnails.readyCount();
     }
 
     /** How many frames this screen has drawn; the self-test waits for a few. */
@@ -104,8 +108,8 @@ public final class ArcadeScreen extends Screen {
         }
 
         int half = (right - left - gap) / 2;
-        EditBox search = new EditBox(this.font, left, 50, half, 18, Component.translatable("openarcade.search"));
-        search.setHint(Component.translatable("openarcade.search").withStyle(s -> s.withColor(DIM)));
+        EditBox search = new EditBox(this.font, left, 50, half, 18, Lang.text("openarcade.search"));
+        search.setHint(Lang.text("openarcade.search").withStyle(s -> s.withColor(DIM)));
         search.setValue(query);
         search.setResponder(text -> {
             query = text;
@@ -114,27 +118,27 @@ public final class ArcadeScreen extends Screen {
         this.addRenderableWidget(search);
 
         int openWidth = 70;
-        EditBox link = new EditBox(this.font, left + half + gap, 50, half - openWidth - gap, 18, Component.translatable("openarcade.link"));
+        EditBox link = new EditBox(this.font, left + half + gap, 50, half - openWidth - gap, 18, Lang.text("openarcade.link"));
         link.setMaxLength(512);
-        link.setHint(Component.translatable("openarcade.link").withStyle(s -> s.withColor(DIM)));
+        link.setHint(Lang.text("openarcade.link").withStyle(s -> s.withColor(DIM)));
         link.setValue(pasted);
         link.setResponder(text -> {
             pasted = text;
             notice = null;
         });
         this.addRenderableWidget(link);
-        this.addRenderableWidget(Button.builder(Component.translatable("openarcade.link.open"), b -> openPasted())
+        this.addRenderableWidget(Button.builder(Lang.text("openarcade.link.open"), b -> openPasted())
                 .bounds(right - openWidth, 49, openWidth, 20)
                 .build());
 
         this.addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> this.onClose())
-                .bounds(this.width / 2 - 100, this.height - FOOTER + 6, 200, 20)
+                .bounds(listRight() - 120, this.height - FOOTER + 6, 120, 20)
                 .build());
     }
 
     private Component tabLabel(int index) {
-        if (index == 0) return Component.translatable("openarcade.tab.recommended");
-        if (index == tabCount() - 1) return Component.translatable("openarcade.tab.sites");
+        if (index == 0) return Lang.text("openarcade.tab.recommended");
+        if (index == tabCount() - 1) return Lang.text("openarcade.tab.sites");
         return Component.literal(catalog.shelves().get(index - 1).tab());
     }
 
@@ -150,7 +154,7 @@ public final class ArcadeScreen extends Screen {
             ArcadeClient.openLink(uri.get());
             notice = null;
         } else {
-            notice = Component.translatable("openarcade.link.invalid");
+            notice = Lang.text("openarcade.link.invalid");
         }
     }
 
@@ -179,9 +183,9 @@ public final class ArcadeScreen extends Screen {
     private @Nullable Component status(List<GameEntry> games) {
         ShelfLoads.Load load = tab == 0 && !catalog.shelves().isEmpty() ? ShelfLoads.get(catalog.shelves().get(0))
                 : tab > 0 && tab < tabCount() - 1 ? ShelfLoads.get(catalog.shelves().get(tab - 1)) : null;
-        if (load != null && !load.done) return Component.translatable("openarcade.loading");
-        if (load != null && !load.error.isEmpty()) return Component.translatable("openarcade.failed", load.error);
-        if (games.isEmpty()) return Component.translatable("openarcade.empty");
+        if (load != null && !load.done) return Lang.text("openarcade.loading");
+        if (load != null && !load.error.isEmpty()) return Lang.text("openarcade.failed", load.error);
+        if (games.isEmpty()) return Lang.text("openarcade.empty");
         return null;
     }
 
@@ -212,7 +216,7 @@ public final class ArcadeScreen extends Screen {
             boolean featured = catalog.recommended().contains(game);
             graphics.text(this.font, this.font.plainSubstrByWidth(game.title(), textWidth), textX, rowY + 6, featured ? GOLD : WHITE);
             graphics.text(this.font, this.font.plainSubstrByWidth(game.blurb(), textWidth), textX, rowY + 20, DIM);
-            String meta = String.join("  ·  ", nonEmpty(featured ? Component.translatable("openarcade.featured").getString() : "",
+            String meta = String.join("  ·  ", nonEmpty(featured ? Lang.string("openarcade.featured") : "",
                     game.site(), game.price()));
             graphics.text(this.font, this.font.plainSubstrByWidth(meta, textWidth), textX, rowY + 34, featured ? GOLD : DIM);
         }
@@ -222,20 +226,16 @@ public final class ArcadeScreen extends Screen {
         if (status != null) {
             graphics.centeredText(this.font, status, this.width / 2, top + (games.isEmpty() ? 20 : -10 + (bottom - top)), DIM);
         }
-        Component footer = notice != null ? notice : Component.translatable("openarcade.opens_in_browser");
-        graphics.text(this.font, this.font.plainSubstrByWidth(footer.getString(), this.width / 2 - 110 - left),
+        Component footer = notice != null ? notice : Lang.text("openarcade.opens_in_browser");
+        graphics.text(this.font, this.font.plainSubstrByWidth(footer.getString(), right - 128 - left),
                 left, this.height - FOOTER + 12, notice != null ? GOLD : DIM);
         framesDrawn++;
     }
 
     private void drawThumbnail(GuiGraphicsExtractor graphics, GameEntry game, int x, int y) {
-        if (game.bundledImage().isPresent()) {
-            // Bundled art is the itch.io card size: 315 x 250.
-            Identifier id = Identifier.parse(game.bundledImage().get());
-            graphics.blit(RenderPipelines.GUI_TEXTURED, id, x, y, 0, 0, THUMB_WIDTH, THUMB_HEIGHT, 315, 250, 315, 250);
-            return;
-        }
-        Optional<Thumbnails.Ready> ready = game.imageUrl().flatMap(thumbnails::get);
+        Optional<Thumbnails.Ready> ready = game.bundledImage().isPresent()
+                ? BundledImages.get(game.bundledImage().get())
+                : game.imageUrl().flatMap(thumbnails::get);
         if (ready.isPresent()) {
             Thumbnails.Ready r = ready.get();
             graphics.blit(RenderPipelines.GUI_TEXTURED, r.id(), x, y, 0, 0, THUMB_WIDTH, THUMB_HEIGHT,

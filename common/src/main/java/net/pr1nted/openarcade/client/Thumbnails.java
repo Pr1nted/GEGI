@@ -65,6 +65,10 @@ final class Thumbnails {
         }
     }
 
+    int readyCount() {
+        return (int) textures.values().stream().filter(Optional::isPresent).count();
+    }
+
     void releaseAll() {
         released = true;
         for (Optional<Ready> ready : textures.values()) {

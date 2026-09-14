@@ -6,6 +6,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.options.OptionsScreen;
 import net.minecraft.network.chat.Component;
 import net.pr1nted.openarcade.client.ArcadeClient;
+import net.pr1nted.openarcade.client.Lang;
 import net.pr1nted.openarcade.client.OptionsButtonHolder;
 import org.jspecify.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
@@ -32,10 +33,10 @@ public abstract class OptionsScreenMixin extends Screen implements OptionsButton
     private void openarcade$addButton(CallbackInfo ci) {
         Screen self = this;
         openarcade$button = this.addRenderableWidget(Button.builder(
-                        Component.translatable("openarcade.button"),
+                        Lang.text("openarcade.button"),
                         button -> ArcadeClient.open(self))
                 .bounds(this.width - 108, 8, 100, 20)
-                .tooltip(Tooltip.create(Component.translatable("openarcade.button.tooltip")))
+                .tooltip(Tooltip.create(Lang.text("openarcade.button.tooltip")))
                 .build());
     }
 
