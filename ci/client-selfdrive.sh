@@ -28,7 +28,7 @@ hmc.exit.on.failed.command=true
 hmc.assets.dummy=true
 EOF
 
-curl -fsSL -o headlessmc-launcher.jar \
+curl -fsSL --retry 5 --retry-all-errors --retry-delay 10 -o headlessmc-launcher.jar \
   "https://github.com/3arthqu4ke/headlessmc/releases/download/${HMC_VERSION}/headlessmc-launcher-${HMC_VERSION}.jar"
 
 if [ ! -f "$MCDIR/versions/$MC/$MC.json" ]; then

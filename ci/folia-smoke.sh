@@ -17,14 +17,14 @@ mkdir -p folia-server/plugins
 cd folia-server
 
 SERVER_KIND=folia
-if ! curl -fsSL "https://fill.papermc.io/v3/projects/folia/versions/${MC}/builds" -o builds.json 2>/dev/null \
+if ! curl -fsSL --retry 5 --retry-all-errors --retry-delay 10 "https://fill.papermc.io/v3/projects/folia/versions/${MC}/builds" -o builds.json 2>/dev/null \
    || ! python3 -c 'import json,sys; b=json.load(open("builds.json")); sys.exit(0 if isinstance(b, list) and b else 1)'; then
   SERVER_KIND=paper
-  curl -fsSL "https://fill.papermc.io/v3/projects/paper/versions/${MC}/builds" -o builds.json
+  curl -fsSL --retry 5 --retry-all-errors --retry-delay 10 "https://fill.papermc.io/v3/projects/paper/versions/${MC}/builds" -o builds.json
 fi
 URL=$(python3 -c 'import json; b=json.load(open("builds.json")); print(b[0]["downloads"]["server:default"]["url"])')
 echo "Starting ${SERVER_KIND} ${MC}"
-[ -f "${SERVER_KIND}-${MC}.jar" ] || curl -fsSL -o "${SERVER_KIND}-${MC}.jar" "$URL"
+[ -f "${SERVER_KIND}-${MC}.jar" ] || curl -fsSL --retry 5 --retry-all-errors --retry-delay 10 -o "${SERVER_KIND}-${MC}.jar" "$URL"
 rm -f plugins/openarcade-folia-*.jar
 find "$JARS" -name 'openarcade-folia-*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' -exec cp {} plugins/ \;
 ls -l plugins
