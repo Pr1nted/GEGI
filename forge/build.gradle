@@ -1,0 +1,35 @@
+plugins {
+    id 'multiloader-loader'
+    id 'net.minecraftforge.gradle'
+}
+
+minecraft {
+    runs {
+        configureEach {
+            workingDir = layout.projectDirectory.dir('runs/client')
+        }
+        register('client')
+        register('server') {
+            workingDir = layout.projectDirectory.dir('runs/server')
+            args '--nogui'
+        }
+    }
+}
+
+repositories {
+    minecraft.mavenizer(it)
+    maven fg.forgeMaven
+    maven fg.minecraftLibsMaven
+    mavenCentral()
+}
+
+dependencies {
+    implementation minecraft.dependency("net.minecraftforge:forge:${minecraft_version}-${forge_version}")
+    annotationProcessor 'net.minecraftforge:eventbus-validator:7.0.5'
+}
+
+jar {
+    manifest {
+        attributes['MixinConfigs'] = "${mod_id}.mixins.json"
+    }
+}

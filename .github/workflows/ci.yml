@@ -1,0 +1,127 @@
+# Open Arcade CI: every loader, launched for real.
+#
+#   build    compile every loader and the Folia plugin; upload the jars
+#   client   start the actual Minecraft 26.2 client, headless, on Fabric, NeoForge
+#            and Forge with the mod installed (headlesshq/mc-runtime-test). The
+#            test mod joins a world and quits. With OPENARCADE_SELFTEST=1 the mod
+#            also opens its own menu, checks the Options button and the /arcade
+#            command, and crashes the game if any of it fails, so a pass means
+#            the menu works, not just that the jar loaded.
+#   quilt    the same, on Quilt, which the action does not install
+#   folia    a Folia 26.2 server starts with the plugin enabled
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  MC_VERSION: "26.2"
+  JAVA_VERSION: "25"
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+      - uses: gradle/actions/setup-gradle@v5
+      - name: Build every loader
+        run: ./gradlew build --console=plain
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jars
+          path: |
+            fabric/build/libs/openarcade-fabric-*.jar
+            neoforge/build/libs/openarcade-neoforge-*.jar
+            forge/build/libs/openarcade-forge-*.jar
+            folia/build/libs/openarcade-folia-*.jar
+          if-no-files-found: error
+
+  client:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - loader: fabric
+            mcrt: fabric
+          - loader: neoforge
+            mcrt: neoforge
+          - loader: forge
+            mcrt: lexforge
+    env:
+      OPENARCADE_SELFTEST: "1"
+    steps:
+      - uses: actions/download-artifact@v5
+        with:
+          name: jars
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+      - name: Install the mod
+        run: |
+          mkdir -p run/mods
+          cp ${{ matrix.loader }}/build/libs/openarcade-${{ matrix.loader }}-*.jar run/mods/
+          # the -sources and -javadoc jars are not mods
+          rm -f run/mods/*-sources.jar run/mods/*-javadoc.jar
+          ls -l run/mods
+      - name: Run the ${{ matrix.loader }} client
+        uses: headlesshq/mc-runtime-test@4.5.1
+        with:
+          mc: ${{ env.MC_VERSION }}
+          modloader: ${{ matrix.loader }}
+          regex: .*${{ matrix.loader }}.*
+          java: ${{ env.JAVA_VERSION }}
+          mc-runtime-test: ${{ matrix.mcrt }}
+
+  quilt:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      OPENARCADE_SELFTEST: "1"
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v5
+        with:
+          name: jars
+          path: jars
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+      - uses: actions/cache@v4
+        with:
+          path: ~/.minecraft
+          key: ${{ runner.os }}-${{ env.MC_VERSION }}-quilt-hmc
+      - name: Run the Quilt client
+        run: ci/quilt-runtime.sh "$MC_VERSION" jars/fabric/build/libs
+
+  folia:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v5
+        with:
+          name: jars
+          path: jars
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+      - name: Start Folia with the plugin
+        run: ci/folia-smoke.sh "$MC_VERSION" jars/folia/build/libs

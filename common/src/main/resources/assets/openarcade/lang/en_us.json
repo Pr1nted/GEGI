@@ -1,0 +1,16 @@
+{
+  "openarcade.title": "Open Arcade",
+  "openarcade.button": "Open Arcade",
+  "openarcade.button.tooltip": "Browse itch.io and Newgrounds web games",
+  "openarcade.tab.recommended": "Recommended",
+  "openarcade.tab.sites": "Browse sites",
+  "openarcade.search": "Search this shelf",
+  "openarcade.link": "Paste an itch.io or Newgrounds link",
+  "openarcade.link.open": "Open link",
+  "openarcade.link.invalid": "Only itch.io and Newgrounds links open here",
+  "openarcade.loading": "Loading games from itch.io...",
+  "openarcade.failed": "Could not reach itch.io: %s",
+  "openarcade.empty": "Nothing matches your search",
+  "openarcade.opens_in_browser": "Games open in your web browser",
+  "openarcade.featured": "Recommended"
+}

@@ -1,0 +1,48 @@
+{
+  "recommended": [
+    {
+      "title": "Open Doctrines",
+      "url": "https://pr1nted.itch.io/open-doctrines",
+      "blurb": "A free grand strategy game about running a country, in your browser.",
+      "price": "Free",
+      "site": "itch.io",
+      "texture": "openarcade:textures/gui/open_doctrines.png"
+    }
+  ],
+  "shelves": [
+    {
+      "id": "itch_popular",
+      "tab": "Popular",
+      "title": "Popular web games on itch.io",
+      "feed": "https://itch.io/games/platform-web.xml"
+    },
+    {
+      "id": "itch_newest",
+      "tab": "Newest",
+      "title": "Newest web games on itch.io",
+      "feed": "https://itch.io/games/newest/platform-web.xml"
+    },
+    {
+      "id": "itch_free",
+      "tab": "Free",
+      "title": "Free web games on itch.io",
+      "feed": "https://itch.io/games/free/platform-web.xml"
+    },
+    {
+      "id": "itch_strategy",
+      "tab": "Strategy",
+      "title": "Strategy web games on itch.io",
+      "feed": "https://itch.io/games/genre-strategy/platform-web.xml"
+    }
+  ],
+  "sites": [
+    {
+      "title": "Browse itch.io web games",
+      "url": "https://itch.io/games/platform-web"
+    },
+    {
+      "title": "Browse Newgrounds games",
+      "url": "https://www.newgrounds.com/games"
+    }
+  ]
+}
