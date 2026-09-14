@@ -20,7 +20,7 @@ Minecraft 1.12.2 to 26.2 · Fabric · Quilt · NeoForge · Forge · Folia (serve
   into a Minecraft screen and every key, click and scroll goes to it. Escape belongs to
   the game you are playing; press it twice to leave. *Open in browser* is always one
   click away.
-- **Three ways in. The GEGI button at the top right of Options; typing
+- **Three ways in.** The GEGI button at the top right of Options; typing
   `/gegi` (or `/arcade`) in chat, handled on your side and never sent to the
   server; and the Config button in your loader's mod list (Mod Menu on Fabric and
   Quilt, the built-in list on NeoForge and Forge).
