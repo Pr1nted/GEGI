@@ -31,7 +31,8 @@ def sub(text, pattern, replacement, flags=0, count=0):
 # No input event records (1.21.9), no RenderPipelines (1.21.6), Identifier was still
 # ResourceLocation (1.21.11), Util and OptionsScreen in their older packages,
 # DynamicTexture without a label, a synchronous Screenshot, no playButtonClickSound,
-# and no JSpecify on the classpath.
+# no NativeImage.getPointer() (versions/1.20.6 adds NativeImageAccessor), and no
+# JSpecify on the classpath.
 
 def to_1_20_6(path, text):
     name = os.path.basename(path)
@@ -126,6 +127,12 @@ def to_1_20_6(path, text):
         t = t.replace("public boolean charTyped(CharacterEvent event) {\n        runtime.send(BrowserProtocol.CHAR + \" \" + event.codepoint() + \" 0\");",
                       "public boolean charTyped(char character, int modifiers) {\n        runtime.send(BrowserProtocol.CHAR + \" \" + (int) character + \" 0\");")
 
+    if name == "GameScreen.java":
+        t = t.replace("MemoryUtil.memByteBuffer(texture.getPixels().getPointer(), width * height * 4)",
+                      "MemoryUtil.memByteBuffer(((NativeImageAccessor) (Object) texture.getPixels()).openarcade$pixels(), width * height * 4)")
+        t = t.replace("import net.pr1nted.openarcade.catalog.GameEntry;",
+                      "import net.pr1nted.openarcade.catalog.GameEntry;\nimport net.pr1nted.openarcade.mixin.NativeImageAccessor;")
+
     if name == "SelfTest.java":
         t = t.replace("MouseButtonEvent click = new MouseButtonEvent(button.getX() + 2, button.getY() + 2, new MouseButtonInfo(0, 0));\n"
                       "                        if (!button.mouseClicked(click, false))",
@@ -158,7 +165,108 @@ def to_1_20_6(path, text):
     return t
 
 
-ERAS = {("1.21.11", "1.20.6"): to_1_20_6}
+# ---- 1.20.6 -> 1.19.4 --------------------------------------------------------------
+# No GuiGraphics (1.20): drawing is GuiComponent's static methods on a PoseStack, a
+# texture is bound with RenderSystem.setShaderTexture before blit, and Screen.render
+# does not draw the menu background by itself (1.20.2). No NeoForge exists yet.
+
+def to_1_19_4(path, text):
+    name = os.path.basename(path)
+    t = text
+    t = t.replace("import net.minecraft.client.gui.GuiGraphics;",
+                  "import com.mojang.blaze3d.systems.RenderSystem;\nimport com.mojang.blaze3d.vertex.PoseStack;")
+    t = sub(t, r"\bGuiGraphics graphics\b", "PoseStack graphics")
+    t = t.replace("graphics.drawCenteredString(", "drawCenteredString(graphics, ")
+    t = t.replace("graphics.drawString(", "drawString(graphics, ")
+    t = t.replace("graphics.fill(", "fill(graphics, ")
+    t = t.replace("graphics.enableScissor(", "enableScissor(")
+    t = t.replace("graphics.disableScissor()", "disableScissor()")
+    # graphics.blit(id, rest...) -> bind id, then GuiComponent.blit(pose, rest...)
+    t = sub(t, r"(\n(\s*))graphics\.blit\(([^,]+),\s*", r"\1RenderSystem.setShaderTexture(0, \3);\1blit(graphics, ")
+    if name == "ArcadeScreen.java":
+        t = t.replace("        super.render(graphics, mouseX, mouseY, a);\n",
+                      "        this.renderBackground(graphics);\n        super.render(graphics, mouseX, mouseY, a);\n", 1)
+    if name in ("ArcadeScreen.java", "GameScreen.java"):
+        t = t.replace("drawn with 1.20.6's GUI", "drawn with 1.19.4's GUI")
+    return t
+
+
+# ---- 1.19.4 -> 1.18.2 --------------------------------------------------------------
+# No Button.builder, Tooltip or EditBox hints (1.19.3), no Component.literal (1.19),
+# no ClientPacketListener.sendCommand: a typed command reaches LocalPlayer.chat("/...")
+# (1.19). No repositionElements or rebuildWidgets, widgets keep x and y as fields,
+# NativeImage reads streams only, and scissoring is RenderSystem's, in window pixels.
+
+def to_1_18_2(path, text):
+    name = os.path.basename(path)
+    t = text
+    t = t.replace("Component.literal(", "new TextComponent(")
+    t = t.replace("import net.minecraft.network.chat.Component;",
+                  "import net.minecraft.network.chat.Component;\nimport net.minecraft.network.chat.TextComponent;")
+    t = sub(t, r"\.withStyle\(s -> s\.withColor\(([A-Z_]+)\)\)", r".withStyle(s -> s.withColor(TextColor.fromRgb(\1 & 0xFFFFFF)))")
+    if "TextColor.fromRgb" in t and "import net.minecraft.network.chat.TextColor;" not in t:
+        t = t.replace("import net.minecraft.network.chat.Component;", "import net.minecraft.network.chat.Component;\nimport net.minecraft.network.chat.TextColor;", 1)
+    # Button.builder(label, onPress).bounds(x, y, w, h)[.tooltip(...)].build() -> new Button(x, y, w, h, label, onPress)
+    t = sub(t, r"Button\.builder\(((?:[^()]|\((?:[^()]|\([^()]*\))*\))*?),\s*((?:[^()]|\((?:[^()]|\([^()]*\))*\))*?)\)\s*\.bounds\(((?:[^()]|\([^()]*\))*)\)\s*(?:\.tooltip\((?:[^()]|\((?:[^()]|\([^()]*\))*\))*\)\s*)?\.build\(\)",
+            r"new Button(\3, \1, \2)")
+    t = t.replace("import net.minecraft.client.gui.components.Tooltip;\n", "")
+    t = sub(t, r"(\w+)\.getX\(\)", r"\1.x")
+    t = sub(t, r"(\w+)\.getY\(\)", r"\1.y")
+
+    if name == "ClientPacketListenerMixin.java":
+        t = """package net.pr1nted.openarcade.mixin;
+
+import net.minecraft.client.player.LocalPlayer;
+import net.pr1nted.openarcade.client.ArcadeClient;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+
+/**
+ * /arcade without a command API. Before 1.19 a typed command is sent as chat starting
+ * with "/", through LocalPlayer.chat, so ours is caught there and never reaches the
+ * server. (The class keeps its name so every version lists the same mixins.)
+ */
+@Mixin(LocalPlayer.class)
+public abstract class ClientPacketListenerMixin {
+
+    @Inject(method = "chat", at = @At("HEAD"), cancellable = true)
+    private void openarcade$interceptCommand(String message, CallbackInfo ci) {
+        if (message.startsWith("/") && ArcadeClient.handleCommand(message.substring(1))) ci.cancel();
+    }
+}
+"""
+    if name == "SelfTest.java":
+        t = t.replace('minecraft.player.connection.sendCommand("arcade");', 'minecraft.player.chat("/arcade");')
+    if name == "OptionsScreenMixin.java":
+        t = sub(t, r"\n    @Inject\(method = \"repositionElements\".*?\n    }\n", "\n", flags=re.S)
+    if name == "ArcadeScreen.java":
+        t = t.replace("this.rebuildWidgets();", "this.clearWidgets();\n                        this.init();")
+        t = sub(t, r"\n(\s*)(\w+)\.setHint\(([^;]*)\);", r"\n\1\2.setSuggestion(\2.getValue().isEmpty() ? \3.getString() : \"\");")
+        t = t.replace("search.setResponder(model::setQuery);",
+                      "search.setResponder(text -> {\n            model.setQuery(text);\n            search.setSuggestion(text.isEmpty() ? Lang.string(\"openarcade.search\") : \"\");\n        });")
+        t = t.replace("link.setResponder(model::setPasted);",
+                      "link.setResponder(text -> {\n            model.setPasted(text);\n            link.setSuggestion(text.isEmpty() ? Lang.string(\"openarcade.link\") : \"\");\n        });")
+        t = t.replace("        enableScissor(left, LIST_TOP, right, bottom);", "        scissor(left, LIST_TOP, right, bottom);")
+        t = t.replace("        disableScissor();", "        RenderSystem.disableScissor();")
+        t = t.replace("    private void drawThumbnail(",
+                      "    /** GuiComponent had no scissor yet: RenderSystem's takes window pixels, from the bottom. */\n"
+                      "    private void scissor(int x1, int y1, int x2, int y2) {\n"
+                      "        double scale = this.minecraft.getWindow().getGuiScale();\n"
+                      "        int windowHeight = this.minecraft.getWindow().getHeight();\n"
+                      "        RenderSystem.enableScissor((int) (x1 * scale), (int) (windowHeight - y2 * scale),\n"
+                      "                (int) ((x2 - x1) * scale), (int) ((y2 - y1) * scale));\n"
+                      "    }\n\n"
+                      "    private void drawThumbnail(", 1)
+    if name == "Thumbnails.java":
+        t = t.replace("NativeImage.read(png)", "NativeImage.read(new java.io.ByteArrayInputStream(png))")
+    if name in ("ArcadeScreen.java", "GameScreen.java"):
+        t = t.replace("drawn with 1.19.4's GUI", "drawn with 1.18.2's GUI")
+    return t
+
+
+ERAS = {("1.21.11", "1.20.6"): to_1_20_6, ("1.20.6", "1.19.4"): to_1_19_4, ("1.19.4", "1.18.2"): to_1_18_2}
 
 
 def set_property(text, name, value):

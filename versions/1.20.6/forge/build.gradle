@@ -1,0 +1,78 @@
+plugins {
+    id 'multiloader-loader'
+    id 'net.minecraftforge.gradle' version '[6.0.46,6.2)'
+    id 'org.spongepowered.mixin' version '0.7-SNAPSHOT'
+}
+
+// Mojang's own libraries (macOS's LWJGL "-patch" natives among them) are not on Maven
+// Central, and ForgeGradle 6 does not add Mojang's repository for them.
+repositories {
+    maven {
+        name = 'Minecraft libraries'
+        url = 'https://libraries.minecraft.net/'
+    }
+    // Mixin's annotation processor, which writes the refmap
+    maven {
+        name = 'Sponge'
+        url = 'https://repo.spongepowered.org/repository/maven-public/'
+    }
+}
+
+mixin {
+    config("${mod_id}.forge.mixins.json")
+    config("${mod_id}.ci.mixins.json")
+}
+
+// Forge's Mixin (0.8.5) knows compatibility levels up to JAVA_21, so Forge keeps its own
+// config of the same mixins; Fabric's and NeoForge's Mixin read the common one.
+jar {
+    manifest {
+        attributes['MixinConfigs'] = "${mod_id}.forge.mixins.json,${mod_id}.ci.mixins.json"
+    }
+}
+
+minecraft {
+    mappings channel: 'official', version: minecraft_version
+    copyIdeResources = true
+    reobf = false // Forge 1.20.6+ runs on Mojang's names, so nothing is reobfuscated
+    runs {
+        client {
+            workingDirectory file('runs/client')
+            mods {
+                modClientRun {
+                    source sourceSets.main
+                }
+            }
+        }
+    }
+}
+
+dependencies {
+    minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
+    annotationProcessor('org.spongepowered:mixin:0.8.5-SNAPSHOT:processor')
+}
+
+sourceSets.each {
+    def dir = layout.buildDirectory.dir("sourcesSets/$it.name")
+    it.output.resourcesDir = dir
+    it.java.destinationDirectory = dir
+}
+
+// Implement mcgradleconventions loader attribute
+def loaderAttribute = Attribute.of('io.github.mcgradleconventions.loader', String)
+['apiElements', 'runtimeElements', 'sourcesElements', 'javadocElements'].each { variant ->
+    configurations.named(variant) {
+        attributes {
+            attribute(loaderAttribute, 'forge')
+        }
+    }
+}
+sourceSets.configureEach {
+    [it.compileClasspathConfigurationName, it.runtimeClasspathConfigurationName].each { variant->
+        configurations.named(variant) {
+            attributes {
+                attribute(loaderAttribute, 'forge')
+            }
+        }
+    }
+}
