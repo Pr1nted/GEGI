@@ -85,6 +85,13 @@ jobs:
           regex: .*${{ matrix.loader }}.*
           java: ${{ env.JAVA_VERSION }}
           mc-runtime-test: ${{ matrix.mcrt }}
+      # A launch that joins a world and quits is not a pass by itself: the mod's
+      # self-test writes this file only after /arcade, the Options button and the
+      # menu all worked. No file, no pass.
+      - name: The self-test ran and passed
+        run: |
+          test -f run/openarcade-selftest-passed || { echo "::error::Open Arcade's in-game self-test did not pass on ${{ matrix.loader }}"; exit 1; }
+          echo "self-test passed on ${{ matrix.loader }}"
 
   quilt:
     needs: build

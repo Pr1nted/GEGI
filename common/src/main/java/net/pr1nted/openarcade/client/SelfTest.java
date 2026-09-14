@@ -19,15 +19,21 @@ import java.util.List;
  * for the menu again, and closes it. Any step that does not happen, or throws,
  * ends the game with a non-zero exit code, which fails the CI job.
  *
- * <p>It runs beside MC-Runtime-Test, which joins the world and quits: that mod
- * waits while a screen is open, so it finishes only after this has closed the menu.
+ * <p>It runs beside MC-Runtime-Test, which joins a world and quits as soon as the
+ * loading screen closes. McRuntimeTestMixin pauses that mod while this test runs.
+ * A pass writes {@link #MARKER} to the game directory, and CI requires the file,
+ * so a job cannot pass without the test having run.
  */
 final class SelfTest {
     private SelfTest() {}
 
-    private static final boolean ENABLED = "1".equals(System.getenv("OPENARCADE_SELFTEST"));
+    /** OPENARCADE_SELFTEST=1 in the environment, or -Dopenarcade.selftest=true. */
+    static final boolean ENABLED = "1".equals(System.getenv("OPENARCADE_SELFTEST"))
+            || Boolean.getBoolean("openarcade.selftest");
     private static final int STEP_TIMEOUT_TICKS = 400;
     private static final int TOTAL_TIMEOUT_TICKS = 1200;
+    private static final int WORLD_TIMEOUT_TICKS = 2400;
+    static final String MARKER = "openarcade-selftest-passed";
 
     private enum Step { WAIT_FOR_WORLD, TYPE_COMMAND, MENU_FROM_COMMAND, OPEN_OPTIONS, CLICK_BUTTON, MENU_FROM_OPTIONS, DONE }
 
@@ -35,10 +41,28 @@ final class SelfTest {
     private static int worldTicks;
     private static int stepTicks;
     private static int totalTicks;
+    private static boolean announced;
+    private static int ticksWithPlayer;
+
+    /**
+     * While this is true the CI harness waits (see McRuntimeTestMixin). From the moment
+     * a player exists, through the loading screen, until the test is done.
+     */
+    static boolean isRunningInWorld() {
+        Minecraft minecraft = Minecraft.getInstance();
+        return ENABLED && step != Step.DONE && minecraft != null && minecraft.player != null;
+    }
 
     static void tick(Minecraft minecraft) {
         if (!ENABLED || step == Step.DONE) return;
+        if (!announced) {
+            announced = true;
+            Constants.LOG.info("[self-test] enabled; waiting for a world");
+        }
         try {
+            if (minecraft.player != null && step == Step.WAIT_FOR_WORLD && ++ticksWithPlayer > WORLD_TIMEOUT_TICKS) {
+                fail("the world never finished loading");
+            }
             if (step != Step.WAIT_FOR_WORLD) {
                 if (++totalTicks > TOTAL_TIMEOUT_TICKS) fail("timed out at " + step);
                 if (++stepTicks > STEP_TIMEOUT_TICKS) fail("stuck at " + step);
@@ -82,6 +106,7 @@ final class SelfTest {
                     if (screen instanceof ArcadeScreen arcade && arcade.framesDrawn() >= 5) {
                         if (!(arcade.parent() instanceof OptionsScreen)) fail("the menu did not remember Options as its parent");
                         minecraft.gui.setScreen(null);
+                        java.nio.file.Files.writeString(minecraft.gameDirectory.toPath().resolve(MARKER), "passed\n");
                         Constants.LOG.info("OPEN ARCADE SELF-TEST PASSED");
                         step = Step.DONE;
                     }

@@ -54,3 +54,10 @@ EOF
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y x11-xserver-utils >/dev/null
 xvfb-run java -Dhmc.check.xvfb=true -jar headlessmc-launcher.jar \
   --command launch '.*quilt.*' -regex --jvm "-Djava.awt.headless=true"
+
+# A launch that joins a world and quits is not a pass by itself; see ci.yml.
+if [ ! -f run/openarcade-selftest-passed ]; then
+  echo "::error::Open Arcade's in-game self-test did not pass on Quilt"
+  exit 1
+fi
+echo "self-test passed on Quilt"
