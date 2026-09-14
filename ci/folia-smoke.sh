@@ -3,6 +3,9 @@
 #
 #   ci/folia-smoke.sh <minecraft version> <folder with the plugin jar>
 #
+# Folia exists from Minecraft 1.19.4. For older versions the same plugin is started
+# on Paper, which Folia is built from and which has builds back to 1.12.2.
+#
 # Passes only when the plugin logs that it is enabled AND the console's /arcade
 # lists Open Doctrines with its link. A server that never starts, a plugin that
 # does not enable, or a command that answers nothing all fail.
@@ -13,9 +16,15 @@ JARS="$(cd "$2" && pwd)"
 mkdir -p folia-server/plugins
 cd folia-server
 
-URL=$(curl -fsSL "https://fill.papermc.io/v3/projects/folia/versions/${MC}/builds" \
-  | python3 -c 'import json,sys; b=json.load(sys.stdin); print(b[0]["downloads"]["server:default"]["url"])')
-[ -f folia.jar ] || curl -fsSL -o folia.jar "$URL"
+SERVER_KIND=folia
+if ! curl -fsSL "https://fill.papermc.io/v3/projects/folia/versions/${MC}/builds" -o builds.json 2>/dev/null \
+   || ! python3 -c 'import json,sys; b=json.load(open("builds.json")); sys.exit(0 if isinstance(b, list) and b else 1)'; then
+  SERVER_KIND=paper
+  curl -fsSL "https://fill.papermc.io/v3/projects/paper/versions/${MC}/builds" -o builds.json
+fi
+URL=$(python3 -c 'import json; b=json.load(open("builds.json")); print(b[0]["downloads"]["server:default"]["url"])')
+echo "Starting ${SERVER_KIND} ${MC}"
+[ -f "${SERVER_KIND}-${MC}.jar" ] || curl -fsSL -o "${SERVER_KIND}-${MC}.jar" "$URL"
 rm -f plugins/openarcade-folia-*.jar
 find "$JARS" -name 'openarcade-folia-*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' -exec cp {} plugins/ \;
 ls -l plugins
@@ -25,7 +34,7 @@ rm -f console.fifo server.log
 mkfifo console.fifo
 # Hold the console open for the whole run, so the server does not see end-of-input.
 exec 3<>console.fifo
-java -Xmx2G -jar folia.jar --nogui < console.fifo > server.log 2>&1 &
+java -Xmx2G -jar "${SERVER_KIND}-${MC}.jar" --nogui < console.fifo > server.log 2>&1 &
 SERVER=$!
 
 wait_for() {
@@ -46,10 +55,10 @@ finish() {
 }
 
 if ! wait_for "Done (" 300; then
-  tail -80 server.log; finish; echo "Folia did not start"; exit 1
+  tail -80 server.log; finish; echo "${SERVER_KIND} did not start"; exit 1
 fi
 if ! grep -q "Open Arcade enabled" server.log; then
-  tail -80 server.log; finish; echo "Open Arcade did not enable on Folia"; exit 1
+  tail -80 server.log; finish; echo "Open Arcade did not enable on ${SERVER_KIND}"; exit 1
 fi
 
 echo "arcade" >&3
@@ -58,4 +67,4 @@ if ! wait_for "Open Doctrines: https://pr1nted.itch.io/open-doctrines" 30; then
 fi
 grep "Open Arcade\|https://" server.log | tail -6
 finish
-echo "Folia started, Open Arcade enabled, and /arcade answered"
+echo "${SERVER_KIND} ${MC} started, Open Arcade enabled, and /arcade answered"

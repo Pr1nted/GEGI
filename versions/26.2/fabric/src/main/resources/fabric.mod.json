@@ -26,7 +26,7 @@
         "${mod_id}.ci.mixins.json"
     ],
     "depends": {
-        "fabricloader": ">=${fabric_loader_version}",
+        "fabricloader": ">=0.14.0",
         "minecraft": "~${minecraft_version}",
         "java": ">=${java_version}"
     },

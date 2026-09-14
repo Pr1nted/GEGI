@@ -9,6 +9,8 @@
 #             OPENARCADE_SELFTEST=1 the mod opens its own menu, checks the Options
 #             button and the /arcade command, and crashes the game if any of it
 #             fails, so a pass means the menu works, not just that the jar loaded
+#   selfdrive the same for versions MC-Runtime-Test has no build for (1.13 to 1.15):
+#             HeadlessMC starts the client and the mod's self-test makes its own world
 #   quilt     the same, on Quilt, which the action does not install
 #   folia     a Folia server starts with the plugin enabled
 #   chromium  the in-game browser without Minecraft, on Linux, Windows and macOS and on
@@ -44,6 +46,7 @@ jobs:
     outputs:
       versions: ${{ steps.plan.outputs.versions }}
       clients: ${{ steps.plan.outputs.clients }}
+      selfdrive: ${{ steps.plan.outputs.selfdrive }}
       quilt: ${{ steps.plan.outputs.quilt }}
       folia: ${{ steps.plan.outputs.folia }}
     steps:
@@ -85,6 +88,7 @@ jobs:
 
   client:
     needs: [plan, build]
+    if: needs.plan.outputs.clients != '[]'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     strategy:
@@ -124,6 +128,39 @@ jobs:
         run: |
           test -f run/openarcade-selftest-passed || { echo "::error::Open Arcade's in-game self-test did not pass on ${{ matrix.minecraft }} ${{ matrix.loader }}"; exit 1; }
           echo "self-test passed on ${{ matrix.minecraft }} ${{ matrix.loader }}"
+
+  selfdrive:
+    needs: [plan, build]
+    if: needs.plan.outputs.selfdrive != '[]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJson(needs.plan.outputs.selfdrive) }}
+    name: client (${{ matrix.minecraft }}, ${{ matrix.loader }})
+    env:
+      OPENARCADE_SELFTEST: "1"
+      # No MC-Runtime-Test to join a world: the self-test creates one, and quits after.
+      OPENARCADE_SELFTEST_CREATE_WORLD: "1"
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: actions/download-artifact@v5
+        with:
+          name: jars-${{ matrix.minecraft }}
+          path: jars
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+      - uses: actions/cache@v4
+        with:
+          path: ~/.minecraft
+          key: ${{ runner.os }}-${{ matrix.minecraft }}-${{ matrix.loader }}-hmc
+      - name: Run the ${{ matrix.loader }} client
+        run: ci/client-selfdrive.sh "${{ matrix.minecraft }}" "${{ matrix.loader }}" jars
 
   quilt:
     needs: [plan, build]

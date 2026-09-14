@@ -3,7 +3,9 @@
 
 Writes GitHub Actions outputs (to $GITHUB_OUTPUT, or stdout when run by hand):
   versions  [{"minecraft", "java"}]                          one build job each
-  clients   [{"minecraft", "java", "loader", "mcrt"}]        one real-client run each
+  clients   [{"minecraft", "java", "loader", "mcrt"}]        one real-client run each, by MC-Runtime-Test
+  selfdrive [{"minecraft", "java", "loader"}]                 the same where MC-Runtime-Test has no build
+                                                            ("mcrt": "none"): the mod makes its own world
   quilt     [{"minecraft", "java"}]                          versions with a Quilt run
   folia     [{"minecraft", "java"}]                          versions with a Folia plugin
 
@@ -45,7 +47,8 @@ def main():
     base = lambda p: {"minecraft": p["minecraft"], "java": p["java"]}
     outputs = {
         "versions": [base(p) for p in all_ports],
-        "clients": [dict(base(p), **c) for p in all_ports for c in p.get("clients", [])],
+        "clients": [dict(base(p), **c) for p in all_ports for c in p.get("clients", []) if c.get("mcrt", "none") != "none"],
+        "selfdrive": [dict(base(p), **c) for p in all_ports for c in p.get("clients", []) if c.get("mcrt", "none") == "none"],
         "quilt": [base(p) for p in all_ports if p.get("quilt")],
         "folia": [base(p) for p in all_ports if p.get("folia")],
     }

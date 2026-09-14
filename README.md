@@ -108,6 +108,9 @@ then **runs the real game** for each:
 
 - **Fabric, NeoForge, Forge.** The client starts headless with
   [MC-Runtime-Test](https://github.com/headlesshq/mc-runtime-test) and joins a world.
+- **Versions MC-Runtime-Test has no build for** (1.13 to 1.15). HeadlessMC starts the
+  client with only Open Arcade installed, and the self-test creates its own world
+  (`ci/client-selfdrive.sh`).
 - **Quilt.** The same, installed with the Quilt installer (`ci/quilt-runtime.sh`).
 - **Folia.** A Folia server of that version starts with the plugin and must log that it is enabled
   (`ci/folia-smoke.sh`).
