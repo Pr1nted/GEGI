@@ -78,6 +78,9 @@ jobs:
           distribution: temurin
           java-version: ${{ matrix.java }}
       - uses: gradle/actions/setup-gradle@v5
+      # The wrapper downloads Gradle once, with no retry; services.gradle.org sometimes answers 504.
+      - name: Fetch Gradle
+        run: for attempt in 1 2 3; do ./gradlew --version --console=plain && exit 0; sleep 30; done; exit 1
       - name: Build every loader
         run: ./gradlew build --console=plain
       - uses: actions/upload-artifact@v4
