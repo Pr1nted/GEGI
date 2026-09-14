@@ -12,15 +12,37 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 /**
  * itch.io's browse pages as data: every browse URL has an RSS twin with ".xml"
  * appended (https://itch.io/games/platform-web.xml). Each item carries
  * {@code plainTitle}, {@code link}, {@code imageurl}, {@code price},
  * {@code currency} and a {@code description} whose first line is the blurb.
+ *
+ * <p>Games that say they are for adults are left out. itch.io already keeps games their
+ * developers flagged as adult off its browse pages, but its feed carries no rating, and
+ * some games are marked only in their own title or blurb ("18+ Yandere"), so those
+ * words are all there is to go on. It is a filter, not a guarantee.
  */
 public final class ItchFeed {
     private ItchFeed() {}
+
+    /** Words a game uses to say it is for adults, matched as whole words in its title and description. */
+    private static final Pattern ADULT = Pattern.compile(
+            "(?<![\\p{L}\\p{N}])(?:"
+                    + "18\\s*\\+|r-?18|nsfw|hentai|porn\\w*|erotic\\w*|lewd|sex|sexual\\w*|nudity|nude|fetish\\w*"
+                    + "|adults?\\s+only|for\\s+adults|adult\\s+(?:content|game|themes?|visual\\s+novel)"
+                    + ")(?![\\p{L}\\p{N}])",
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
+
+    /** True when the title, itch.io's tagged title or the description says the game is for adults. */
+    static boolean saysAdult(String... texts) {
+        for (String text : texts) {
+            if (text != null && ADULT.matcher(text.replaceAll("<[^>]*>", " ")).find()) return true;
+        }
+        return false;
+    }
 
     public static List<GameEntry> parse(byte[] xml) throws Exception {
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
@@ -46,6 +68,7 @@ public final class ItchFeed {
                 continue;
             }
             if (title.isEmpty() || !Links.isAllowed(link)) continue;
+            if (saysAdult(title, text(item, "title"), text(item, "description"))) continue;
             Optional<URI> image = Optional.empty();
             try {
                 String raw = text(item, "imageurl");

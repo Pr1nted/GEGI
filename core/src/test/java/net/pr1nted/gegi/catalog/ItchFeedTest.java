@@ -50,6 +50,36 @@ class ItchFeedTest {
     }
 
     @Test
+    void leavesOutGamesThatSayTheyAreForAdults() throws Exception {
+        // The first is a real item from https://itch.io/games/free/platform-web.xml (2026-09-14).
+        String xml = """
+                <?xml version="1.0" encoding="UTF-8" ?><rss version="2.0"><channel>
+                <item><plainTitle>The Freak Circus</plainTitle><title>The Freak Circus [Free] [Visual Novel]</title><link>https://garula.itch.io/the-freak-circus</link><description>18+ Yandere &lt;img src="https://img.itch.zone/a.png"/&gt;</description></item>
+                <item><plainTitle>Night Shift [NSFW]</plainTitle><link>https://a.itch.io/night-shift</link></item>
+                <item><plainTitle>Quiet Room</plainTitle><link>https://b.itch.io/quiet-room</link><description>An adult visual novel</description></item>
+                <item><plainTitle>Garden</plainTitle><link>https://c.itch.io/garden</link><description>A cosy farming game</description></item>
+                <item><plainTitle>Essex Express</plainTitle><link>https://d.itch.io/essex</link><description>Trains for young adults, rated 12+</description></item>
+                </channel></rss>""";
+        List<GameEntry> games = ItchFeed.parse(xml.getBytes(StandardCharsets.UTF_8));
+        assertEquals(List.of("Garden", "Essex Express"), games.stream().map(GameEntry::title).toList());
+    }
+
+    @Test
+    void adultWordsAreMatchedAsWholeWords() {
+        assertTrue(ItchFeed.saysAdult("18+ Yandere"));
+        assertTrue(ItchFeed.saysAdult("Rated 18 +"));
+        assertTrue(ItchFeed.saysAdult("[R-18] demo"));
+        assertTrue(ItchFeed.saysAdult("For adults only"));
+        assertTrue(ItchFeed.saysAdult("Hentai puzzle"));
+        assertTrue(ItchFeed.saysAdult("<b>NSFW</b>"));
+        assertFalse(ItchFeed.saysAdult("Middlesex Motors"));
+        assertFalse(ItchFeed.saysAdult("A game for young adults"));
+        assertFalse(ItchFeed.saysAdult("Top 118+ levels"));
+        assertTrue(ItchFeed.saysAdult(null, "Pornographic"), "a null text is skipped, the next one still counts");
+        assertFalse(ItchFeed.saysAdult("Grand strategy about running a country"));
+    }
+
+    @Test
     void refusesADoctype() {
         // A feed is network data: a DTD is how an external-entity attack starts.
         String xml = """
