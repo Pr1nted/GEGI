@@ -32,14 +32,14 @@ dependencies {
 // The protocol constants live in the mod's core; compile the same file here.
 sourceSets.main.java {
     srcDir project(':core').file('src/main/java')
-    include 'org/cef/**', 'net/pr1nted/openarcade/browser/**'
+    include 'org/cef/**', 'net/pr1nted/gegi/browser/**'
 }
 
 tasks.register('helperJar', Jar) {
-    archiveFileName = 'openarcade-browser.jar'
+    archiveFileName = 'gegi-browser.jar'
     destinationDirectory = layout.buildDirectory.dir('helper')
     manifest {
-        attributes 'Main-Class': 'net.pr1nted.openarcade.browser.BrowserHost'
+        attributes 'Main-Class': 'net.pr1nted.gegi.browser.BrowserHost'
     }
     from sourceSets.main.output
     dependsOn configurations.runtimeClasspath
@@ -69,7 +69,7 @@ tasks.register('smokeTest', JavaExec) {
     description = 'Drives the Chromium helper through every protocol command.'
     dependsOn 'helperJar', 'smokeClasses'
     classpath = sourceSets.smoke.runtimeClasspath
-    mainClass = 'net.pr1nted.openarcade.browser.HelperSmoke'
+    mainClass = 'net.pr1nted.gegi.browser.HelperSmoke'
     if (project.hasProperty('smokeJavaHome')) {
         def windows = System.getProperty('os.name').toLowerCase().contains('win')
         executable = new File(project.property('smokeJavaHome') as String, windows ? 'bin/java.exe' : 'bin/java').absolutePath
@@ -77,5 +77,5 @@ tasks.register('smokeTest', JavaExec) {
         javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(java_version) }
     }
     def install = project.hasProperty('smokeInstall') ? project.property('smokeInstall') : layout.buildDirectory.dir('chromium').get().asFile.absolutePath
-    args layout.buildDirectory.file('helper/openarcade-browser.jar').get().asFile.absolutePath, install
+    args layout.buildDirectory.file('helper/gegi-browser.jar').get().asFile.absolutePath, install
 }

@@ -81,7 +81,7 @@ unimined.minecraft(sourceSets.forge) {
     combineWith(sourceSets.main)
     minecraftForge {
         loader forge_version
-        mixinConfig 'openarcade.forge.mixins.json', 'openarcade.ci.mixins.json'
+        mixinConfig 'gegi.forge.mixins.json', 'gegi.ci.mixins.json'
     }
     defaultRemapJar = true
 }
@@ -141,7 +141,7 @@ tasks.named('processForgeResources', ProcessResources) {
     inputs.properties(expandProps)
 }
 
-// Where CI looks for every version's jars: <loader>/build/libs/openarcade-<loader>-<minecraft>-<version>.jar
+// Where CI looks for every version's jars: <loader>/build/libs/gegi-<loader>-<minecraft>-<version>.jar
 ['fabric', 'forge'].each { loader ->
     tasks.matching { it.name == "remap${loader.capitalize()}Jar" }.configureEach {
         archiveFileName = "${mod_id}-${loader}-${minecraft_version}-${version}.jar"

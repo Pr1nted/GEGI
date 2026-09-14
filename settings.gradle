@@ -1,4 +1,4 @@
-// The version-independent half of Open Arcade, buildable and testable on its own:
+// The version-independent half of GEGI, buildable and testable on its own:
 //   ./gradlew :core:test :browser:smokeTest
 // Each Minecraft version is its own build under versions/<minecraft>/, with its own
 // Gradle, plugins and Java, and includes these two projects from here.

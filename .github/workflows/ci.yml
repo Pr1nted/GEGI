@@ -1,4 +1,4 @@
-# Open Arcade CI: every Minecraft version, every loader, launched for real.
+# GEGI CI: every Minecraft version, every loader, launched for real.
 #
 #   plan      read versions/*/port.json; every job below is a matrix over them, so a
 #             new port is a new directory and nothing here changes
@@ -6,7 +6,7 @@
 #             with its unit tests); upload the jars
 #   client    start the actual Minecraft client, headless, on each version's loaders
 #             with the mod installed (headlesshq/mc-runtime-test). With
-#             OPENARCADE_SELFTEST=1 the mod opens its own menu, checks the Options
+#             GEGI_SELFTEST=1 the mod opens its own menu, checks the Options
 #             button and the /arcade command, and crashes the game if any of it
 #             fails, so a pass means the menu works, not just that the jar loaded
 #   selfdrive the same for versions MC-Runtime-Test has no build for (1.13 to 1.15):
@@ -55,7 +55,7 @@ jobs:
           ref: ${{ inputs.ref }}
       - id: plan
         env:
-          OPENARCADE_ONLY_VERSION: ${{ inputs.minecraft }}
+          GEGI_ONLY_VERSION: ${{ inputs.minecraft }}
         run: python3 ci/plan.py
 
   build:
@@ -78,15 +78,16 @@ jobs:
           distribution: temurin
           java-version: ${{ matrix.java }}
       - uses: gradle/actions/setup-gradle@v5
-      # The wrapper downloads Gradle once, with no retry; services.gradle.org sometimes answers 504.
+      # The wrapper downloads Gradle once, with no retry; services.gradle.org sometimes answers 504
+      # or stalls for minutes (the wrapper's own timeout is 60 s, set in gradle-wrapper.properties).
       - name: Fetch Gradle
-        run: for attempt in 1 2 3; do ./gradlew --version --console=plain && exit 0; sleep 30; done; exit 1
+        run: for attempt in 1 2 3 4 5; do ./gradlew --version --console=plain && exit 0; sleep 60; done; exit 1
       - name: Build every loader
         run: ./gradlew build --console=plain
       - uses: actions/upload-artifact@v4
         with:
           name: jars-${{ matrix.minecraft }}
-          path: versions/${{ matrix.minecraft }}/*/build/libs/openarcade-*.jar
+          path: versions/${{ matrix.minecraft }}/*/build/libs/gegi-*.jar
           if-no-files-found: error
 
   client:
@@ -102,7 +103,7 @@ jobs:
         include: ${{ fromJson(needs.plan.outputs.clients) }}
     name: client (${{ matrix.minecraft }}, ${{ matrix.loader }})
     env:
-      OPENARCADE_SELFTEST: "1"
+      GEGI_SELFTEST: "1"
     steps:
       # GitHub's artifact service sometimes answers 403 for a moment: one more try after a pause.
       - id: jars
@@ -123,7 +124,7 @@ jobs:
       - name: Install the mod
         run: |
           mkdir -p run/mods
-          cp ${{ matrix.loader }}/build/libs/openarcade-${{ matrix.loader }}-*.jar run/mods/
+          cp ${{ matrix.loader }}/build/libs/gegi-${{ matrix.loader }}-*.jar run/mods/
           # the -sources and -javadoc jars are not mods
           rm -f run/mods/*-sources.jar run/mods/*-javadoc.jar
           ls -l run/mods
@@ -140,7 +141,7 @@ jobs:
       # menu all worked. No file, no pass.
       - name: The self-test ran and passed
         run: |
-          test -f run/openarcade-selftest-passed || { echo "::error::Open Arcade's in-game self-test did not pass on ${{ matrix.minecraft }} ${{ matrix.loader }}"; exit 1; }
+          test -f run/gegi-selftest-passed || { echo "::error::GEGI's in-game self-test did not pass on ${{ matrix.minecraft }} ${{ matrix.loader }}"; exit 1; }
           echo "self-test passed on ${{ matrix.minecraft }} ${{ matrix.loader }}"
 
   selfdrive:
@@ -154,9 +155,9 @@ jobs:
         include: ${{ fromJson(needs.plan.outputs.selfdrive) }}
     name: client (${{ matrix.minecraft }}, ${{ matrix.loader }})
     env:
-      OPENARCADE_SELFTEST: "1"
+      GEGI_SELFTEST: "1"
       # No MC-Runtime-Test to join a world: the self-test creates one, and quits after.
-      OPENARCADE_SELFTEST_CREATE_WORLD: "1"
+      GEGI_SELFTEST_CREATE_WORLD: "1"
     steps:
       - uses: actions/checkout@v5
         with:
@@ -197,7 +198,7 @@ jobs:
         include: ${{ fromJson(needs.plan.outputs.quilt) }}
     name: quilt (${{ matrix.minecraft }})
     env:
-      OPENARCADE_SELFTEST: "1"
+      GEGI_SELFTEST: "1"
     steps:
       - uses: actions/checkout@v5
         with:
@@ -294,11 +295,11 @@ jobs:
       # Chromium is ~100 MB; the mod downloads it once per player, CI once per OS.
       - uses: actions/cache@v4
         with:
-          path: ${{ runner.temp }}/openarcade-chromium/jcef-bundle
+          path: ${{ runner.temp }}/gegi-chromium/jcef-bundle
           key: chromium-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('browser/build.gradle') }}
       - name: Drive the helper (Linux, under a virtual display)
         if: runner.os == 'Linux'
-        run: xvfb-run -a ./gradlew :core:test :browser:smokeTest --console=plain "-PsmokeJavaHome=${{ steps.smoke-java.outputs.path }}" "-PsmokeInstall=${{ runner.temp }}/openarcade-chromium"
+        run: xvfb-run -a ./gradlew :core:test :browser:smokeTest --console=plain "-PsmokeJavaHome=${{ steps.smoke-java.outputs.path }}" "-PsmokeInstall=${{ runner.temp }}/gegi-chromium"
       - name: Drive the helper
         if: runner.os != 'Linux'
-        run: ./gradlew :browser:smokeTest --console=plain "-PsmokeJavaHome=${{ steps.smoke-java.outputs.path }}" "-PsmokeInstall=${{ runner.temp }}/openarcade-chromium"
+        run: ./gradlew :browser:smokeTest --console=plain "-PsmokeJavaHome=${{ steps.smoke-java.outputs.path }}" "-PsmokeInstall=${{ runner.temp }}/gegi-chromium"

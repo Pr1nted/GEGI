@@ -16,7 +16,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 
-UA = {"User-Agent": "OpenArcade-autoport (github.com/Pr1nted/Open-Arcade)"}
+UA = {"User-Agent": "Gegi-autoport (github.com/Pr1nted/Open-Arcade)"}
 
 
 def get(url, parse="json"):

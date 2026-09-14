@@ -5,8 +5,8 @@
 #   ci/client-selfdrive.sh <minecraft version> <loader: fabric|forge> <folder with the jars>
 #
 # HeadlessMC downloads the game and installs the loader, and launches it with only
-# Open Arcade in mods/. Nothing joins a world for the mod here, so the job sets
-# OPENARCADE_SELFTEST_CREATE_WORLD=1: the self-test creates a world from the title
+# GEGI in mods/. Nothing joins a world for the mod here, so the job sets
+# GEGI_SELFTEST_CREATE_WORLD=1: the self-test creates a world from the title
 # screen, runs its checks there, writes the marker and quits the game.
 set -euo pipefail
 
@@ -37,10 +37,10 @@ if [ ! -f "$MCDIR/versions/$MC/$MC.json" ]; then
 fi
 ls "$MCDIR/versions"
 
-find "$JARS" -name "openarcade-${LOADER}-*.jar" ! -name '*-sources.jar' ! -name '*-javadoc.jar' -exec cp {} run/mods/ \;
+find "$JARS" -name "gegi-${LOADER}-*.jar" ! -name '*-sources.jar' ! -name '*-javadoc.jar' -exec cp {} run/mods/ \;
 ls -l run/mods
-if ! ls run/mods/openarcade-*.jar >/dev/null 2>&1; then
-  echo "::error::no openarcade-${LOADER} jar in $JARS"
+if ! ls run/mods/gegi-*.jar >/dev/null 2>&1; then
+  echo "::error::no gegi-${LOADER} jar in $JARS"
   exit 1
 fi
 
@@ -54,8 +54,8 @@ sudo DEBIAN_FRONTEND=noninteractive apt-get install -y x11-xserver-utils >/dev/n
 timeout 1200 xvfb-run java -Dhmc.check.xvfb=true -jar headlessmc-launcher.jar \
   --command launch ".*${LOADER}.*" -regex --jvm "-Djava.awt.headless=true" || true
 
-if [ ! -f run/openarcade-selftest-passed ]; then
-  echo "::error::Open Arcade's in-game self-test did not pass on ${MC} ${LOADER}"
+if [ ! -f run/gegi-selftest-passed ]; then
+  echo "::error::GEGI's in-game self-test did not pass on ${MC} ${LOADER}"
   exit 1
 fi
 echo "self-test passed on ${MC} ${LOADER}"

@@ -129,9 +129,9 @@ def to_1_20_6(path, text):
 
     if name == "GameScreen.java":
         t = t.replace("MemoryUtil.memByteBuffer(texture.getPixels().getPointer(), width * height * 4)",
-                      "MemoryUtil.memByteBuffer(((NativeImageAccessor) (Object) texture.getPixels()).openarcade$pixels(), width * height * 4)")
-        t = t.replace("import net.pr1nted.openarcade.catalog.GameEntry;",
-                      "import net.pr1nted.openarcade.catalog.GameEntry;\nimport net.pr1nted.openarcade.mixin.NativeImageAccessor;")
+                      "MemoryUtil.memByteBuffer(((NativeImageAccessor) (Object) texture.getPixels()).gegi$pixels(), width * height * 4)")
+        t = t.replace("import net.pr1nted.gegi.catalog.GameEntry;",
+                      "import net.pr1nted.gegi.catalog.GameEntry;\nimport net.pr1nted.gegi.mixin.NativeImageAccessor;")
 
     if name == "SelfTest.java":
         t = t.replace("MouseButtonEvent click = new MouseButtonEvent(button.getX() + 2, button.getY() + 2, new MouseButtonInfo(0, 0));\n"
@@ -222,10 +222,10 @@ def to_1_18_2(path, text):
     t = sub(t, r"(\w+)\.getY\(\)", r"\1.y")
 
     if name == "ClientPacketListenerMixin.java":
-        t = """package net.pr1nted.openarcade.mixin;
+        t = """package net.pr1nted.gegi.mixin;
 
 import net.minecraft.client.player.LocalPlayer;
-import net.pr1nted.openarcade.client.ArcadeClient;
+import net.pr1nted.gegi.client.ArcadeClient;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -240,20 +240,20 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class ClientPacketListenerMixin {
 
     @Inject(method = "chat", at = @At("HEAD"), cancellable = true)
-    private void openarcade$interceptCommand(String message, CallbackInfo ci) {
+    private void gegi$interceptCommand(String message, CallbackInfo ci) {
         if (message.startsWith("/") && ArcadeClient.handleCommand(message.substring(1))) ci.cancel();
     }
 }
 """
     if name == "SelfTest.java":
-        t = t.replace('minecraft.player.connection.sendCommand("arcade");', 'minecraft.player.chat("/arcade");')
+        t = t.replace('minecraft.player.connection.sendCommand("gegi");', 'minecraft.player.chat("/gegi");')
     if name == "ArcadeScreen.java":
         t = t.replace("this.rebuildWidgets();", "this.clearWidgets();\n                        this.init();")
         t = sub(t, r"\n(\s*)(\w+)\.setHint\(([^;]*)\);", r'\n\1\2.setSuggestion(\2.getValue().isEmpty() ? \3.getString() : "");')
         t = t.replace("search.setResponder(model::setQuery);",
-                      "search.setResponder(text -> {\n            model.setQuery(text);\n            search.setSuggestion(text.isEmpty() ? Lang.string(\"openarcade.search\") : \"\");\n        });")
+                      "search.setResponder(text -> {\n            model.setQuery(text);\n            search.setSuggestion(text.isEmpty() ? Lang.string(\"gegi.search\") : \"\");\n        });")
         t = t.replace("link.setResponder(model::setPasted);",
-                      "link.setResponder(text -> {\n            model.setPasted(text);\n            link.setSuggestion(text.isEmpty() ? Lang.string(\"openarcade.link\") : \"\");\n        });")
+                      "link.setResponder(text -> {\n            model.setPasted(text);\n            link.setSuggestion(text.isEmpty() ? Lang.string(\"gegi.link\") : \"\");\n        });")
         t = t.replace("        enableScissor(left, LIST_TOP, right, bottom);", "        scissor(left, LIST_TOP, right, bottom);")
         t = t.replace("        disableScissor();", "        RenderSystem.disableScissor();")
         t = t.replace("    private void drawThumbnail(",
@@ -267,7 +267,7 @@ public abstract class ClientPacketListenerMixin {
                       "    private void drawThumbnail(", 1)
     if name == "Thumbnails.java":
         t = t.replace("NativeImage.read(png)", "NativeImage.read(new java.io.ByteArrayInputStream(png))")
-    if name == "OpenArcadeForge.java":
+    if name == "GegiForge.java":
         # Forge 40 calls it a config GUI: ConfigScreenHandler.ConfigScreenFactory came with 1.19.
         t = t.replace("import net.minecraftforge.client.ConfigScreenHandler;", "import net.minecraftforge.client.ConfigGuiHandler;")
         t = t.replace("ConfigScreenHandler.ConfigScreenFactory", "ConfigGuiHandler.ConfigGuiFactory")
@@ -284,7 +284,7 @@ public abstract class ClientPacketListenerMixin {
 def to_1_17_1(path, text):
     name = os.path.basename(path)
     t = text
-    if name == "OpenArcadeForge.java":
+    if name == "GegiForge.java":
         t = t.replace("import net.minecraftforge.client.ConfigGuiHandler;", "import net.minecraftforge.fmlclient.ConfigGuiHandler;")
         t = t.replace("// Forge 40 has no constructor injection", "// Forge 37 has no constructor injection")
     if name in ("ArcadeScreen.java", "GameScreen.java"):
@@ -347,8 +347,8 @@ def to_1_16_5(path, text):
     name = os.path.basename(path)
     t = _java8_records(text)
     # Java 8
-    t = t.replace('Set.of("arcade", "openarcade")',
-                  'java.util.Collections.unmodifiableSet(new java.util.HashSet<>(java.util.Arrays.asList("arcade", "openarcade")))')
+    t = t.replace('Set.of("arcade", "gegi")',
+                  'java.util.Collections.unmodifiableSet(new java.util.HashSet<>(java.util.Arrays.asList("arcade", "gegi")))')
     t = t.replace("command.strip()", "command.trim()")
     t = t.replace("TARGET.isBlank()", "TARGET.trim().isEmpty()")
     t = t.replace("Path.of(", "java.nio.file.Paths.get(")
@@ -394,19 +394,19 @@ def to_1_16_5(path, text):
     t = sub(t, r"RenderSystem\.setShaderTexture\(0, ([^;]+)\);", r"this.minecraft.getTextureManager().bind(\1);")
     t = t.replace("Screenshot.takeScreenshot(minecraft.getMainRenderTarget())",
                   "Screenshot.takeScreenshot(minecraft.getWindow().getWidth(), minecraft.getWindow().getHeight(), minecraft.getMainRenderTarget())")
-    if name == "OpenArcadeForge.java":
-        t = """package net.pr1nted.openarcade.forge;
+    if name == "GegiForge.java":
+        t = """package net.pr1nted.gegi.forge;
 
 import net.minecraftforge.fml.ExtensionPoint;
 import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
-import net.pr1nted.openarcade.Constants;
-import net.pr1nted.openarcade.client.ArcadeClient;
+import net.pr1nted.gegi.Constants;
+import net.pr1nted.gegi.client.ArcadeClient;
 
 /** Forge. The Config button in Forge's mod list opens the arcade. */
 @Mod(Constants.MOD_ID)
-public final class OpenArcadeForge {
-    public OpenArcadeForge() {
+public final class GegiForge {
+    public GegiForge() {
         // Forge 36 registers a mod's config screen as an extension point.
         ModLoadingContext.get().registerExtensionPoint(ExtensionPoint.CONFIGGUIFACTORY,
                 () -> (minecraft, parent) -> ArcadeClient.screen(parent));
@@ -431,20 +431,20 @@ ERAS = {("1.21.11", "1.20.6"): to_1_20_6, ("1.20.6", "1.19.4"): to_1_19_4, ("1.1
 SELF_DRIVEN = """
     /**
      * Where MC-Runtime-Test has no build (1.13 to 1.15), nothing joins a world for the
-     * test: with OPENARCADE_SELFTEST_CREATE_WORLD=1 it creates a flat creative world from
+     * test: with GEGI_SELFTEST_CREATE_WORLD=1 it creates a flat creative world from
      * the title screen, and quits the game once it has passed.
      */
-    static final boolean CREATE_WORLD = "1".equals(System.getenv("OPENARCADE_SELFTEST_CREATE_WORLD"));
+    static final boolean CREATE_WORLD = "1".equals(System.getenv("GEGI_SELFTEST_CREATE_WORLD"));
     private static boolean worldRequested;
 
     private static void createWorldIfAsked(Minecraft minecraft) {
         if (!CREATE_WORLD || worldRequested || minecraft.level != null) return;
         if (!(minecraft.screen instanceof net.minecraft.client.gui.screens.TitleScreen)) return;
         worldRequested = true;
-        String id = "openarcade-selftest";
+        String id = "gegi-selftest";
         if (minecraft.getLevelSource().levelExists(id)) minecraft.getLevelSource().deleteLevel(id);
         Constants.LOG.info("[self-test] creating a world");
-        minecraft.selectLevel(id, "Open Arcade self-test", new net.minecraft.world.level.LevelSettings(
+        minecraft.selectLevel(id, "GEGI self-test", new net.minecraft.world.level.LevelSettings(
                 0L, net.minecraft.world.level.GameType.CREATIVE, false, false, net.minecraft.world.level.LevelType.FLAT));
     }
 """
@@ -491,13 +491,13 @@ def to_1_15_2(path, text):
         t = t.replace("public static MutableComponent text(", "public static Component text(")
     if name == "ArcadeClient.java":
         # ConfirmScreen's buttons are Strings here
-        t = t.replace('Lang.text("openarcade.consent.download"),', 'Lang.string("openarcade.consent.download"),')
-        t = t.replace('Lang.text("openarcade.consent.browser")', 'Lang.string("openarcade.consent.browser")')
+        t = t.replace('Lang.text("gegi.consent.download"),', 'Lang.string("gegi.consent.download"),')
+        t = t.replace('Lang.text("gegi.consent.browser")', 'Lang.string("gegi.consent.browser")')
     if name == "SelfTest.java":
         t = t.replace("    static void tick(Minecraft minecraft) {\n        if (!ENABLED || step == Step.DONE) return;",
                       SELF_DRIVEN + "\n    static void tick(Minecraft minecraft) {\n        if (!ENABLED || step == Step.DONE) return;\n        createWorldIfAsked(minecraft);")
-        t = t.replace('Constants.LOG.info("OPEN ARCADE SELF-TEST PASSED");\n                        step = Step.DONE;',
-                      'Constants.LOG.info("OPEN ARCADE SELF-TEST PASSED");\n                        step = Step.DONE;\n'
+        t = t.replace('Constants.LOG.info("GEGI SELF-TEST PASSED");\n                        step = Step.DONE;',
+                      'Constants.LOG.info("GEGI SELF-TEST PASSED");\n                        step = Step.DONE;\n'
                       '                        if (CREATE_WORLD) minecraft.stop();')
     if name in ("ArcadeScreen.java", "GameScreen.java"):
         t = t.replace("drawn with 1.16.5's GUI", "drawn with 1.15.2's GUI")
@@ -511,12 +511,12 @@ ERAS[("1.16.5", "1.15.2")] = to_1_15_2
 # The API the mod uses is 1.15.2's (which already clips with OpenGL's scissor).
 # Mod Menu 1.7 is published as io.github.prospector.
 
-MODMENU_1_7 = """package net.pr1nted.openarcade.fabric;
+MODMENU_1_7 = """package net.pr1nted.gegi.fabric;
 
 import io.github.prospector.modmenu.api.ModMenuApi;
 import net.minecraft.client.gui.screens.Screen;
-import net.pr1nted.openarcade.Constants;
-import net.pr1nted.openarcade.client.ArcadeClient;
+import net.pr1nted.gegi.Constants;
+import net.pr1nted.gegi.client.ArcadeClient;
 
 import java.util.function.Function;
 
@@ -537,10 +537,10 @@ public final class ModMenuIntegration implements ModMenuApi {
 
 # Forge 28 (1.14.4) ships no Mixin, so on Forge the Options button, /arcade, the tick
 # and the pixel address come from Forge's events and reflection. Fabric keeps its mixins.
-PIXELS_1_14_4 = """package net.pr1nted.openarcade.client;
+PIXELS_1_14_4 = """package net.pr1nted.gegi.client;
 
 import com.mojang.blaze3d.platform.NativeImage;
-import net.pr1nted.openarcade.mixin.NativeImageAccessor;
+import net.pr1nted.gegi.mixin.NativeImageAccessor;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
@@ -557,7 +557,7 @@ final class Pixels {
 
     static long address(NativeImage image) {
         Object o = image;
-        if (o instanceof NativeImageAccessor) return ((NativeImageAccessor) o).openarcade$pixels();
+        if (o instanceof NativeImageAccessor) return ((NativeImageAccessor) o).gegi$pixels();
         try {
             if (field == null) {
                 for (Field f : NativeImage.class.getDeclaredFields()) {
@@ -577,7 +577,7 @@ final class Pixels {
 }
 """
 
-FORGE_EVENTS_1_14_4 = """package net.pr1nted.openarcade.forge;
+FORGE_EVENTS_1_14_4 = """package net.pr1nted.gegi.forge;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.OptionsScreen;
@@ -585,7 +585,7 @@ import net.minecraftforge.client.event.ClientChatEvent;
 import net.minecraftforge.client.event.GuiScreenEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.pr1nted.openarcade.client.ArcadeClient;
+import net.pr1nted.gegi.client.ArcadeClient;
 
 /**
  * Forge 28 ships no Mixin, so on Forge the Options button, /arcade and the tick come
@@ -615,10 +615,10 @@ public final class ForgeEvents {
 }
 """
 
-OPTIONS_BUTTON_1_14_4 = """    /** The Open Arcade button for an Options screen, remembered for the self-test. */
+OPTIONS_BUTTON_1_14_4 = """    /** The GEGI button for an Options screen, remembered for the self-test. */
     public static net.minecraft.client.gui.components.Button optionsButtonFor(Screen options) {
         optionsButton = new net.minecraft.client.gui.components.Button(options.width - 108, 8, 100, 20,
-                Lang.string("openarcade.button"), b -> open(options));
+                Lang.string("gegi.button"), b -> open(options));
         return optionsButton;
     }
 
@@ -632,31 +632,31 @@ OPTIONS_BUTTON_1_14_4 = """    /** The Open Arcade button for an Options screen,
 
 def _forge_events_1_14_4(name, t):
     if name == "GameScreen.java":
-        t = t.replace("import net.pr1nted.openarcade.mixin.NativeImageAccessor;\n", "")
-        t = t.replace("((NativeImageAccessor) (Object) texture.getPixels()).openarcade$pixels()", "Pixels.address(texture.getPixels())")
+        t = t.replace("import net.pr1nted.gegi.mixin.NativeImageAccessor;\n", "")
+        t = t.replace("((NativeImageAccessor) (Object) texture.getPixels()).gegi$pixels()", "Pixels.address(texture.getPixels())")
     elif name == "ArcadeClient.java":
         t = t.replace("    private static Catalog catalog;\n",
                       "    private static Catalog catalog;\n    private static net.minecraft.client.gui.components.Button optionsButton;\n", 1)
         t = t.replace("    public static void open(Screen parent) {", OPTIONS_BUTTON_1_14_4 + "    public static void open(Screen parent) {", 1)
     elif name == "OptionsScreenMixin.java":
-        t = re.sub(r"        Screen self = this;\n        openarcade\$button = this\.addButton\(new Button\(this\.width - 108, 8, 100, 20, *\n"
-                   r" *Lang\.string\(\"openarcade\.button\"\), button -> ArcadeClient\.open\(self\)\)\);",
-                   "        openarcade$button = this.addButton(ArcadeClient.optionsButtonFor(this));", t)
+        t = re.sub(r"        Screen self = this;\n        gegi\$button = this\.addButton\(new Button\(this\.width - 108, 8, 100, 20, *\n"
+                   r" *Lang\.string\(\"gegi\.button\"\), button -> ArcadeClient\.open\(self\)\)\);",
+                   "        gegi$button = this.addButton(ArcadeClient.optionsButtonFor(this));", t)
     elif name == "SelfTest.java":
-        t = t.replace('                    minecraft.player.chat("/arcade");\n',
+        t = t.replace('                    minecraft.player.chat("/gegi");\n',
                       "                    // Through a chat screen, as a player types it: that is where Forge fires ClientChatEvent,\n"
                       "                    // and it reaches LocalPlayer.chat, where Fabric's mixin listens.\n"
                       "                    net.minecraft.client.gui.screens.ChatScreen chat = new net.minecraft.client.gui.screens.ChatScreen(\"\");\n"
                       "                    chat.init(minecraft, minecraft.window.getGuiScaledWidth(), minecraft.window.getGuiScaledHeight());\n"
-                      '                    chat.sendMessage("/arcade", false);\n')
+                      '                    chat.sendMessage("/gegi", false);\n')
         t = t.replace("if (screen instanceof OptionsScreen && screen instanceof OptionsButtonHolder) {",
                       "if (screen instanceof OptionsScreen && ArcadeClient.lastOptionsButton() != null) {")
         t = t.replace("                        OptionsButtonHolder holder = (OptionsButtonHolder) (Object) screen;\n"
-                      "                        Button button = holder.openarcade$optionsButton();\n"
-                      '                        if (button == null || !options.children().contains(button)) fail("no Open Arcade button in Options");\n',
+                      "                        Button button = holder.gegi$optionsButton();\n"
+                      '                        if (button == null || !options.children().contains(button)) fail("no GEGI button in Options");\n',
                       "                        Button button = ArcadeClient.lastOptionsButton();\n"
-                      '                        if (!options.children().contains(button)) fail("no Open Arcade button in Options");\n')
-    elif name == "OpenArcadeForge.java":
+                      '                        if (!options.children().contains(button)) fail("no GEGI button in Options");\n')
+    elif name == "GegiForge.java":
         t = t.replace("import net.minecraftforge.fml.ExtensionPoint;", "import net.minecraftforge.common.MinecraftForge;\nimport net.minecraftforge.fml.ExtensionPoint;", 1)
         t = t.replace('        Constants.LOG.info("{} loaded on Forge", Constants.MOD_NAME);',
                       '        MinecraftForge.EVENT_BUS.register(new ForgeEvents());\n        Constants.LOG.info("{} loaded on Forge", Constants.MOD_NAME);', 1)
@@ -762,9 +762,9 @@ def main():
     # Java, at most 17, and the CI-only config, whose one mixin needs nothing new, JAVA_8.
     if versions.key(target) <= [1, 20, 6]:
         level = f"JAVA_{min(int(loaders['java_version']), 17)}"
-        for rel, level in (("common/src/main/resources/openarcade.mixins.json", level),
-                           ("forge/src/main/resources/openarcade.forge.mixins.json", level),
-                           ("common/src/main/resources/openarcade.ci.mixins.json", "JAVA_8")):
+        for rel, level in (("common/src/main/resources/gegi.mixins.json", level),
+                           ("forge/src/main/resources/gegi.forge.mixins.json", level),
+                           ("common/src/main/resources/gegi.ci.mixins.json", "JAVA_8")):
             path = os.path.join(dst, rel)
             if os.path.isfile(path):
                 text = open(path, encoding="utf-8").read()
@@ -778,12 +778,12 @@ def main():
             text = open(build_file, encoding="utf-8").read()
             open(build_file, "w", encoding="utf-8").write(text.replace('"com.terraformersmc:modmenu:', '"io.github.prospector:modmenu:')
                                                           .replace("includeGroup 'com.terraformersmc'", "includeGroup 'io.github.prospector'")
-                                                          .replace("        mixinConfig 'openarcade.forge.mixins.json', 'openarcade.ci.mixins.json'\n",
+                                                          .replace("        mixinConfig 'gegi.forge.mixins.json', 'gegi.ci.mixins.json'\n",
                                                                    "        // No mixin configs: Forge 28 ships no Mixin, and with a Mixin mod installed they would\n"
                                                                    "        // add a second button and a second tick next to the Forge events that do the work.\n"))
         # Forge 28 has no Mixin: the files its events and reflection need.
-        for rel, body in (("common/src/main/java/net/pr1nted/openarcade/client/Pixels.java", PIXELS_1_14_4),
-                          ("forge/src/main/java/net/pr1nted/openarcade/forge/ForgeEvents.java", FORGE_EVENTS_1_14_4)):
+        for rel, body in (("common/src/main/java/net/pr1nted/gegi/client/Pixels.java", PIXELS_1_14_4),
+                          ("forge/src/main/java/net/pr1nted/gegi/forge/ForgeEvents.java", FORGE_EVENTS_1_14_4)):
             if os.path.isdir(os.path.join(dst, os.path.dirname(rel))):
                 open(os.path.join(dst, rel), "w", encoding="utf-8").write(body)
 

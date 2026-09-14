@@ -11,14 +11,14 @@
         "homepage": "https://pr1nted.itch.io/open-doctrines"
     },
     "license": "${license}",
-    "icon": "assets/openarcade/icon.png",
+    "icon": "assets/gegi/icon.png",
     "environment": "client",
     "entrypoints": {
         "client": [
-            "net.pr1nted.openarcade.fabric.OpenArcadeFabric"
+            "net.pr1nted.gegi.fabric.GegiFabric"
         ],
         "modmenu": [
-            "net.pr1nted.openarcade.fabric.ModMenuIntegration"
+            "net.pr1nted.gegi.fabric.ModMenuIntegration"
         ]
     },
     "mixins": [

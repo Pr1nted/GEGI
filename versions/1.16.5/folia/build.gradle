@@ -20,8 +20,8 @@ dependencies {
 processResources {
     inputs.property('version', version)
     // The same catalog the client mod ships, so both recommend the same games.
-    from(project(':core').file('src/main/resources/assets/openarcade/catalog.json')) {
-        into 'openarcade'
+    from(project(':core').file('src/main/resources/assets/gegi/catalog.json')) {
+        into 'gegi'
     }
     filesMatching('plugin.yml') {
         expand('version': version, 'minecraft_version': minecraft_version, 'description': project.description)

@@ -1,4 +1,4 @@
-# Ports Open Arcade to each new Minecraft release, tested before anyone sees it.
+# Ports GEGI to each new Minecraft release, tested before anyone sees it.
 #
 # Every day: is there a release newer than the newest versions/<minecraft>, with its
 # loaders out? If so, ci/port/port.py copies the newest port and moves it to the new

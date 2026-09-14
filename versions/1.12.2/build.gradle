@@ -82,7 +82,7 @@ tasks.named('processForgeResources', ProcessResources) {
     inputs.properties(expandProps)
 }
 
-// Where CI looks for every version's jars: <loader>/build/libs/openarcade-<loader>-<minecraft>-<version>.jar
+// Where CI looks for every version's jars: <loader>/build/libs/gegi-<loader>-<minecraft>-<version>.jar
 ['forge'].each { loader ->
     tasks.matching { it.name == "remap${loader.capitalize()}Jar" }.configureEach {
         archiveFileName = "${mod_id}-${loader}-${minecraft_version}-${version}.jar"

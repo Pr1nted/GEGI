@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# A Folia server starts with the Open Arcade plugin, answers /arcade, and stops.
+# A Folia server starts with the GEGI plugin, answers /gegi, and stops.
 #
 #   ci/folia-smoke.sh <minecraft version> <folder with the plugin jar>
 #
 # Folia exists from Minecraft 1.19.4. For older versions the same plugin is started
 # on Paper, which Folia is built from and which has builds back to 1.12.2.
 #
-# Passes only when the plugin logs that it is enabled AND the console's /arcade
+# Passes only when the plugin logs that it is enabled AND the console's /gegi
 # lists Open Doctrines with its link. A server that never starts, a plugin that
 # does not enable, or a command that answers nothing all fail.
 set -euo pipefail
@@ -25,8 +25,8 @@ fi
 URL=$(python3 -c 'import json; b=json.load(open("builds.json")); print(b[0]["downloads"]["server:default"]["url"])')
 echo "Starting ${SERVER_KIND} ${MC}"
 [ -f "${SERVER_KIND}-${MC}.jar" ] || curl -fsSL --retry 8 --retry-all-errors --retry-delay 20 -o "${SERVER_KIND}-${MC}.jar" "$URL"
-rm -f plugins/openarcade-folia-*.jar
-find "$JARS" -name 'openarcade-folia-*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' -exec cp {} plugins/ \;
+rm -f plugins/gegi-folia-*.jar
+find "$JARS" -name 'gegi-folia-*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' -exec cp {} plugins/ \;
 ls -l plugins
 echo "eula=true" > eula.txt
 
@@ -57,14 +57,14 @@ finish() {
 if ! wait_for "Done (" 300; then
   tail -80 server.log; finish; echo "${SERVER_KIND} did not start"; exit 1
 fi
-if ! grep -q "Open Arcade enabled" server.log; then
-  tail -80 server.log; finish; echo "Open Arcade did not enable on ${SERVER_KIND}"; exit 1
+if ! grep -q "GEGI enabled" server.log; then
+  tail -80 server.log; finish; echo "GEGI did not enable on ${SERVER_KIND}"; exit 1
 fi
 
-echo "arcade" >&3
+echo "gegi" >&3
 if ! wait_for "Open Doctrines: https://pr1nted.itch.io/open-doctrines" 30; then
-  tail -40 server.log; finish; echo "/arcade did not list Open Doctrines"; exit 1
+  tail -40 server.log; finish; echo "/gegi did not list Open Doctrines"; exit 1
 fi
-grep "Open Arcade\|https://" server.log | tail -6
+grep "GEGI\|https://" server.log | tail -6
 finish
-echo "${SERVER_KIND} ${MC} started, Open Arcade enabled, and /arcade answered"
+echo "${SERVER_KIND} ${MC} started, GEGI enabled, and /gegi answered"

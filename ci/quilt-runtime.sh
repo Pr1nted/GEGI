@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# The Quilt client, headless, with Open Arcade and the MC-Runtime-Test mod.
+# The Quilt client, headless, with GEGI and the MC-Runtime-Test mod.
 #
-#   ci/quilt-runtime.sh <minecraft version> <folder with the Fabric build of Open Arcade>
+#   ci/quilt-runtime.sh <minecraft version> <folder with the Fabric build of GEGI>
 #
 # headlesshq/mc-runtime-test installs Fabric, Forge and NeoForge but not Quilt, so
 # this repeats its steps with the Quilt installer in the middle: HeadlessMC
@@ -52,14 +52,14 @@ done
 ls "$MCDIR/versions"
 
 # MC-Runtime-Test has no build for 1.13 to 1.15; there the mod's self-test makes its own
-# world and quits the game (OPENARCADE_SELFTEST_CREATE_WORLD).
+# world and quits the game (GEGI_SELFTEST_CREATE_WORLD).
 if ! curl -fsSL --retry 8 --retry-all-errors --retry-delay 20 -o "run/mods/mc-runtime-test-${MC}-${MCRT_VERSION}-fabric-release.jar" \
   "https://github.com/headlesshq/mc-runtime-test/releases/download/${MCRT_VERSION}/mc-runtime-test-${MC}-${MCRT_VERSION}-fabric-release.jar"; then
   rm -f "run/mods/mc-runtime-test-${MC}-${MCRT_VERSION}-fabric-release.jar"
-  export OPENARCADE_SELFTEST_CREATE_WORLD=1
+  export GEGI_SELFTEST_CREATE_WORLD=1
   echo "No MC-Runtime-Test for ${MC}: the self-test creates its own world"
 fi
-find "$JARS" -name 'openarcade-fabric-*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' -exec cp {} run/mods/ \;
+find "$JARS" -name 'gegi-fabric-*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' -exec cp {} run/mods/ \;
 ls -l run/mods
 
 cat >> run/options.txt <<EOF
@@ -72,8 +72,8 @@ timeout 1200 xvfb-run java -Dhmc.check.xvfb=true -jar headlessmc-launcher.jar \
   --command launch '.*quilt.*' -regex --jvm "-Djava.awt.headless=true" || true
 
 # A launch that joins a world and quits is not a pass by itself; see ci.yml.
-if [ ! -f run/openarcade-selftest-passed ]; then
-  echo "::error::Open Arcade's in-game self-test did not pass on Quilt"
+if [ ! -f run/gegi-selftest-passed ]; then
+  echo "::error::GEGI's in-game self-test did not pass on Quilt"
   exit 1
 fi
 echo "self-test passed on Quilt"

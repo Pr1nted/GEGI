@@ -39,7 +39,7 @@ def ports():
 
 def main():
     all_ports = ports()
-    only = os.environ.get("OPENARCADE_ONLY_VERSION", "").strip()
+    only = os.environ.get("GEGI_ONLY_VERSION", "").strip()
     if only:
         all_ports = [p for p in all_ports if p["minecraft"] == only]
         if not all_ports:

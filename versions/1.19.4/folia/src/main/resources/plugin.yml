@@ -1,6 +1,6 @@
-name: OpenArcade
+name: GEGI
 version: '${version}'
-main: net.pr1nted.openarcade.folia.OpenArcadePlugin
+main: net.pr1nted.gegi.folia.GegiPlugin
 api-version: '1.19'
 folia-supported: true
 author: Pr1nted
@@ -8,4 +8,4 @@ description: '${description}'
 commands:
   arcade:
     description: Lists web games you can open, starting with Open Doctrines.
-    aliases: [openarcade]
+    aliases: [gegi]

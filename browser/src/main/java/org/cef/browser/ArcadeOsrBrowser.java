@@ -1,7 +1,7 @@
 package org.cef.browser;
 
-import net.pr1nted.openarcade.browser.AwtKeys;
-import net.pr1nted.openarcade.browser.FrameSink;
+import net.pr1nted.gegi.browser.AwtKeys;
+import net.pr1nted.gegi.browser.FrameSink;
 import org.cef.CefBrowserSettings;
 import org.cef.CefClient;
 import org.cef.callback.CefDragData;
@@ -128,7 +128,7 @@ public final class ArcadeOsrBrowser extends CefBrowser_N implements CefRenderHan
             field.setAccessible(true);
             return field;
         } catch (Exception e) {
-            System.err.println("Open Arcade: cannot set KeyEvent.scancode (" + e + "); key presses will not reach pages");
+            System.err.println("GEGI: cannot set KeyEvent.scancode (" + e + "); key presses will not reach pages");
             return null;
         }
     }

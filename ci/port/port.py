@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Ports Open Arcade to a new Minecraft version, the way a person starts a port.
+"""Ports GEGI to a new Minecraft version, the way a person starts a port.
 
   port.py <from> <to> [--summary summary.md]
 
@@ -133,7 +133,7 @@ def main():
         f.write("\n")
 
     summary = [
-        f"Ports Open Arcade from Minecraft {args.source} to **{args.target}**, made by `ci/port/port.py` from a copy of `versions/{args.source}`.",
+        f"Ports GEGI from Minecraft {args.source} to **{args.target}**, made by `ci/port/port.py` from a copy of `versions/{args.source}`.",
         "",
         "**Moved to:**",
         *[f"- {c}" for c in changes],
