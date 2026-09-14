@@ -535,6 +535,134 @@ public final class ModMenuIntegration implements ModMenuApi {
 """
 
 
+# Forge 28 (1.14.4) ships no Mixin, so on Forge the Options button, /arcade, the tick
+# and the pixel address come from Forge's events and reflection. Fabric keeps its mixins.
+PIXELS_1_14_4 = """package net.pr1nted.openarcade.client;
+
+import com.mojang.blaze3d.platform.NativeImage;
+import net.pr1nted.openarcade.mixin.NativeImageAccessor;
+
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+
+/**
+ * Where a NativeImage keeps its pixels. Through the mixin accessor where Mixin runs
+ * (Fabric), and by reflection where it does not: Forge 28 ships no Mixin. A
+ * NativeImage has exactly one long instance field, the address.
+ */
+final class Pixels {
+    private Pixels() {}
+
+    private static Field field;
+
+    static long address(NativeImage image) {
+        Object o = image;
+        if (o instanceof NativeImageAccessor) return ((NativeImageAccessor) o).openarcade$pixels();
+        try {
+            if (field == null) {
+                for (Field f : NativeImage.class.getDeclaredFields()) {
+                    if (f.getType() == long.class && !Modifier.isStatic(f.getModifiers())) {
+                        f.setAccessible(true);
+                        field = f;
+                        break;
+                    }
+                }
+                if (field == null) throw new IllegalStateException("NativeImage has no pixel address field");
+            }
+            return field.getLong(image);
+        } catch (IllegalAccessException e) {
+            throw new IllegalStateException("cannot read NativeImage's pixel address", e);
+        }
+    }
+}
+"""
+
+FORGE_EVENTS_1_14_4 = """package net.pr1nted.openarcade.forge;
+
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.OptionsScreen;
+import net.minecraftforge.client.event.ClientChatEvent;
+import net.minecraftforge.client.event.GuiScreenEvent;
+import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.pr1nted.openarcade.client.ArcadeClient;
+
+/**
+ * Forge 28 ships no Mixin, so on Forge the Options button, /arcade and the tick come
+ * from Forge's own events instead of the mixins Fabric uses. Nothing extra to install.
+ */
+public final class ForgeEvents {
+
+    @SubscribeEvent
+    public void onScreenInit(GuiScreenEvent.InitGuiEvent.Post event) {
+        if (event.getGui() instanceof OptionsScreen) {
+            event.addWidget(ArcadeClient.optionsButtonFor(event.getGui()));
+        }
+    }
+
+    @SubscribeEvent
+    public void onChat(ClientChatEvent event) {
+        String message = event.getMessage();
+        if (message.startsWith("/") && ArcadeClient.handleCommand(message.substring(1))) {
+            event.setCanceled(true);
+        }
+    }
+
+    @SubscribeEvent
+    public void onTick(TickEvent.ClientTickEvent event) {
+        if (event.phase == TickEvent.Phase.END) ArcadeClient.tick(Minecraft.getInstance());
+    }
+}
+"""
+
+OPTIONS_BUTTON_1_14_4 = """    /** The Open Arcade button for an Options screen, remembered for the self-test. */
+    public static net.minecraft.client.gui.components.Button optionsButtonFor(Screen options) {
+        optionsButton = new net.minecraft.client.gui.components.Button(options.width - 108, 8, 100, 20,
+                Lang.string("openarcade.button"), b -> open(options));
+        return optionsButton;
+    }
+
+    /** The button optionsButtonFor made last, or null. */
+    public static net.minecraft.client.gui.components.Button lastOptionsButton() {
+        return optionsButton;
+    }
+
+"""
+
+
+def _forge_events_1_14_4(name, t):
+    if name == "GameScreen.java":
+        t = t.replace("import net.pr1nted.openarcade.mixin.NativeImageAccessor;\n", "")
+        t = t.replace("((NativeImageAccessor) (Object) texture.getPixels()).openarcade$pixels()", "Pixels.address(texture.getPixels())")
+    elif name == "ArcadeClient.java":
+        t = t.replace("    private static Catalog catalog;\n",
+                      "    private static Catalog catalog;\n    private static net.minecraft.client.gui.components.Button optionsButton;\n", 1)
+        t = t.replace("    public static void open(Screen parent) {", OPTIONS_BUTTON_1_14_4 + "    public static void open(Screen parent) {", 1)
+    elif name == "OptionsScreenMixin.java":
+        t = re.sub(r"        Screen self = this;\n        openarcade\$button = this\.addButton\(new Button\(this\.width - 108, 8, 100, 20, *\n"
+                   r" *Lang\.string\(\"openarcade\.button\"\), button -> ArcadeClient\.open\(self\)\)\);",
+                   "        openarcade$button = this.addButton(ArcadeClient.optionsButtonFor(this));", t)
+    elif name == "SelfTest.java":
+        t = t.replace('                    minecraft.player.chat("/arcade");\n',
+                      "                    // Through a chat screen, as a player types it: that is where Forge fires ClientChatEvent,\n"
+                      "                    // and it reaches LocalPlayer.chat, where Fabric's mixin listens.\n"
+                      "                    net.minecraft.client.gui.screens.ChatScreen chat = new net.minecraft.client.gui.screens.ChatScreen(\"\");\n"
+                      "                    chat.init(minecraft, minecraft.window.getGuiScaledWidth(), minecraft.window.getGuiScaledHeight());\n"
+                      '                    chat.sendMessage("/arcade", false);\n')
+        t = t.replace("if (screen instanceof OptionsScreen && screen instanceof OptionsButtonHolder) {",
+                      "if (screen instanceof OptionsScreen && ArcadeClient.lastOptionsButton() != null) {")
+        t = t.replace("                        OptionsButtonHolder holder = (OptionsButtonHolder) (Object) screen;\n"
+                      "                        Button button = holder.openarcade$optionsButton();\n"
+                      '                        if (button == null || !options.children().contains(button)) fail("no Open Arcade button in Options");\n',
+                      "                        Button button = ArcadeClient.lastOptionsButton();\n"
+                      '                        if (!options.children().contains(button)) fail("no Open Arcade button in Options");\n')
+    elif name == "OpenArcadeForge.java":
+        t = t.replace("import net.minecraftforge.fml.ExtensionPoint;", "import net.minecraftforge.common.MinecraftForge;\nimport net.minecraftforge.fml.ExtensionPoint;", 1)
+        t = t.replace('        Constants.LOG.info("{} loaded on Forge", Constants.MOD_NAME);',
+                      '        MinecraftForge.EVENT_BUS.register(new ForgeEvents());\n        Constants.LOG.info("{} loaded on Forge", Constants.MOD_NAME);', 1)
+    return t
+
+
 def to_1_14_4(path, text):
     name = os.path.basename(path)
     t = text
@@ -548,7 +676,7 @@ def to_1_14_4(path, text):
         t = t.replace("import com.mojang.blaze3d.systems.RenderSystem;\n", "")
     if name in ("ArcadeScreen.java", "GameScreen.java"):
         t = t.replace("drawn with 1.15.2's GUI", "drawn with 1.14.4's GUI")
-    return t
+    return _forge_events_1_14_4(name, t)
 
 
 ERAS[("1.15.2", "1.14.4")] = to_1_14_4
@@ -649,7 +777,15 @@ def main():
         if os.path.isfile(build_file):
             text = open(build_file, encoding="utf-8").read()
             open(build_file, "w", encoding="utf-8").write(text.replace('"com.terraformersmc:modmenu:', '"io.github.prospector:modmenu:')
-                                                          .replace("includeGroup 'com.terraformersmc'", "includeGroup 'io.github.prospector'"))
+                                                          .replace("includeGroup 'com.terraformersmc'", "includeGroup 'io.github.prospector'")
+                                                          .replace("        mixinConfig 'openarcade.forge.mixins.json', 'openarcade.ci.mixins.json'\n",
+                                                                   "        // No mixin configs: Forge 28 ships no Mixin, and with a Mixin mod installed they would\n"
+                                                                   "        // add a second button and a second tick next to the Forge events that do the work.\n"))
+        # Forge 28 has no Mixin: the files its events and reflection need.
+        for rel, body in (("common/src/main/java/net/pr1nted/openarcade/client/Pixels.java", PIXELS_1_14_4),
+                          ("forge/src/main/java/net/pr1nted/openarcade/forge/ForgeEvents.java", FORGE_EVENTS_1_14_4)):
+            if os.path.isdir(os.path.join(dst, os.path.dirname(rel))):
+                open(os.path.join(dst, rel), "w", encoding="utf-8").write(body)
 
     changed = []
     for base, _, files in os.walk(dst):
