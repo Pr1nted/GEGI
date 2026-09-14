@@ -1,0 +1,16 @@
+{
+  "minecraft": "1.19.4",
+  "java": 17,
+  "clients": [
+    {
+      "loader": "fabric",
+      "mcrt": "fabric"
+    },
+    {
+      "loader": "forge",
+      "mcrt": "lexforge"
+    }
+  ],
+  "quilt": true,
+  "folia": true
+}

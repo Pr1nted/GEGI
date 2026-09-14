@@ -1,0 +1,36 @@
+{
+    "schemaVersion": 1,
+    "id": "${mod_id}",
+    "version": "${version}",
+    "name": "${mod_name}",
+    "description": "${description}",
+    "authors": [
+        "${mod_author}"
+    ],
+    "contact": {
+        "homepage": "https://pr1nted.itch.io/open-doctrines"
+    },
+    "license": "${license}",
+    "icon": "assets/openarcade/icon.png",
+    "environment": "client",
+    "entrypoints": {
+        "client": [
+            "net.pr1nted.openarcade.fabric.OpenArcadeFabric"
+        ],
+        "modmenu": [
+            "net.pr1nted.openarcade.fabric.ModMenuIntegration"
+        ]
+    },
+    "mixins": [
+        "${mod_id}.mixins.json",
+        "${mod_id}.ci.mixins.json"
+    ],
+    "depends": {
+        "fabricloader": ">=0.14.0",
+        "minecraft": "~${minecraft_version}",
+        "java": ">=${java_version}"
+    },
+    "suggests": {
+        "modmenu": "*"
+    }
+}

@@ -183,6 +183,10 @@ def to_1_19_4(path, text):
     t = t.replace("graphics.disableScissor()", "disableScissor()")
     # graphics.blit(id, rest...) -> bind id, then GuiComponent.blit(pose, rest...)
     t = sub(t, r"(\n(\s*))graphics\.blit\(([^,]+),\s*", r"\1RenderSystem.setShaderTexture(0, \3);\1blit(graphics, ")
+    # One scroll amount, the vertical one (the horizontal one came in 1.20.2).
+    t = t.replace("public boolean mouseScrolled(double x, double y, double scrollX, double scrollY) {",
+                  "public boolean mouseScrolled(double x, double y, double scrollY) {\n        double scrollX = 0; // 1.19.4 reports one wheel, the vertical one")
+    t = t.replace("super.mouseScrolled(x, y, scrollX, scrollY)", "super.mouseScrolled(x, y, scrollY)")
     if name == "ArcadeScreen.java":
         t = t.replace("        super.render(graphics, mouseX, mouseY, a);\n",
                       "        this.renderBackground(graphics);\n        super.render(graphics, mouseX, mouseY, a);\n", 1)
@@ -243,7 +247,7 @@ public abstract class ClientPacketListenerMixin {
         t = sub(t, r"\n    @Inject\(method = \"repositionElements\".*?\n    }\n", "\n", flags=re.S)
     if name == "ArcadeScreen.java":
         t = t.replace("this.rebuildWidgets();", "this.clearWidgets();\n                        this.init();")
-        t = sub(t, r"\n(\s*)(\w+)\.setHint\(([^;]*)\);", r"\n\1\2.setSuggestion(\2.getValue().isEmpty() ? \3.getString() : \"\");")
+        t = sub(t, r"\n(\s*)(\w+)\.setHint\(([^;]*)\);", r'\n\1\2.setSuggestion(\2.getValue().isEmpty() ? \3.getString() : "");')
         t = t.replace("search.setResponder(model::setQuery);",
                       "search.setResponder(text -> {\n            model.setQuery(text);\n            search.setSuggestion(text.isEmpty() ? Lang.string(\"openarcade.search\") : \"\");\n        });")
         t = t.replace("link.setResponder(model::setPasted);",
@@ -261,12 +265,33 @@ public abstract class ClientPacketListenerMixin {
                       "    private void drawThumbnail(", 1)
     if name == "Thumbnails.java":
         t = t.replace("NativeImage.read(png)", "NativeImage.read(new java.io.ByteArrayInputStream(png))")
+    if name == "OpenArcadeForge.java":
+        # Forge 40 calls it a config GUI: ConfigScreenHandler.ConfigScreenFactory came with 1.19.
+        t = t.replace("import net.minecraftforge.client.ConfigScreenHandler;", "import net.minecraftforge.client.ConfigGuiHandler;")
+        t = t.replace("ConfigScreenHandler.ConfigScreenFactory", "ConfigGuiHandler.ConfigGuiFactory")
+        t = t.replace("// Forge 45 has no constructor injection", "// Forge 40 has no constructor injection")
     if name in ("ArcadeScreen.java", "GameScreen.java"):
         t = t.replace("drawn with 1.19.4's GUI", "drawn with 1.18.2's GUI")
     return t
 
 
-ERAS = {("1.21.11", "1.20.6"): to_1_20_6, ("1.20.6", "1.19.4"): to_1_19_4, ("1.19.4", "1.18.2"): to_1_18_2}
+# ---- 1.18.2 -> 1.17.1 --------------------------------------------------------------
+# The client API the mod uses is 1.18.2's. Java 16 (the mixin levels follow it, see
+# main), and Forge 37 still kept its client classes in net.minecraftforge.fmlclient.
+
+def to_1_17_1(path, text):
+    name = os.path.basename(path)
+    t = text
+    if name == "OpenArcadeForge.java":
+        t = t.replace("import net.minecraftforge.client.ConfigGuiHandler;", "import net.minecraftforge.fmlclient.ConfigGuiHandler;")
+        t = t.replace("// Forge 40 has no constructor injection", "// Forge 37 has no constructor injection")
+    if name in ("ArcadeScreen.java", "GameScreen.java"):
+        t = t.replace("drawn with 1.18.2's GUI", "drawn with 1.17.1's GUI")
+    return t
+
+
+ERAS = {("1.21.11", "1.20.6"): to_1_20_6, ("1.20.6", "1.19.4"): to_1_19_4, ("1.19.4", "1.18.2"): to_1_18_2,
+        ("1.18.2", "1.17.1"): to_1_17_1}
 
 
 def set_property(text, name, value):
@@ -296,6 +321,9 @@ def main():
                 "forge_loader_version_range", "modmenu_version", "paper_api_version"):
         if loaders.get(key):
             text = set_property(text, key, loaders[key])
+    # NeoForge 20.6's loader is javafml 3; from 1.21 it is 4.
+    if versions.key(target) < [1, 21]:
+        text = set_property(text, "neoforge_loader_version_range", "[2,)")
     open(props, "w", encoding="utf-8").write(text)
 
     # Read before opening for writing: open(..., "w") empties the file first.
@@ -312,6 +340,21 @@ def main():
     port["java"] = loaders["java_version"]
     json.dump(port, open(port_json, "w", encoding="utf-8"), indent=2)
     open(port_json, "a", encoding="utf-8").write("\n")
+
+    # Mixin configs. Up to 1.20.6 the loaders ship Mixin 0.8.5 (Forge 50 and NeoForge 20.6
+    # included, on Java 21), which knows no level above JAVA_17 and refuses to start the
+    # game on one it does not know. So the shared and Forge configs ask for the build's
+    # Java, at most 17, and the CI-only config, whose one mixin needs nothing new, JAVA_8.
+    if versions.key(target) <= [1, 20, 6]:
+        level = f"JAVA_{min(int(loaders['java_version']), 17)}"
+        for rel, level in (("common/src/main/resources/openarcade.mixins.json", level),
+                           ("forge/src/main/resources/openarcade.forge.mixins.json", level),
+                           ("common/src/main/resources/openarcade.ci.mixins.json", "JAVA_8")):
+            path = os.path.join(dst, rel)
+            if os.path.isfile(path):
+                text = open(path, encoding="utf-8").read()
+                open(path, "w", encoding="utf-8").write(
+                    re.sub(r'"compatibilityLevel":\s*"[^"]*"', f'"compatibilityLevel": "{level}"', text))
 
     changed = []
     for base, _, files in os.walk(dst):
