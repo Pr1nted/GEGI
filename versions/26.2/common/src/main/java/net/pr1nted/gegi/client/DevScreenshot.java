@@ -22,12 +22,17 @@ import java.nio.file.Path;
  * click (GEGI_SCREENSHOT_CLICK=x,y as fractions of the view; itch.io's "Run game"
  * by default) through the game screen's own input path, and a second shot 45 seconds
  * later, next to the first with "-clicked" in its name.
+ *
+ * <p>GEGI_PLAY=1 on its own does the same without screenshots and never quits: the game
+ * opens over the title screen, "Run game" is clicked once, and the player takes over.
  */
 final class DevScreenshot {
     private DevScreenshot() {}
 
     private static final String TARGET = System.getenv("GEGI_SCREENSHOT");
     private static final boolean PLAY = "1".equals(System.getenv("GEGI_SCREENSHOT_PLAY"));
+    /** Play the first recommendation for a person, with no screenshots and no quitting. */
+    private static final boolean PLAY_ONLY = "1".equals(System.getenv("GEGI_PLAY"));
     /** Where to click, as fractions of the game view: itch.io's "Run game" by default. */
     private static final double[] CLICK = parseClick(System.getenv("GEGI_SCREENSHOT_CLICK"));
     private static final int MIN_THUMBNAILS = 6;
@@ -41,18 +46,21 @@ final class DevScreenshot {
     private static int shotTick = -1;
 
     static void tick(Minecraft minecraft) {
-        if (TARGET == null || TARGET.isBlank() || taken) return;
+        if (taken) return;
+        boolean shots = TARGET != null && !TARGET.isBlank();
+        if (!shots && !PLAY_ONLY) return;
         Screen screen = minecraft.gui.screen();
         if (!opened) {
             if (screen instanceof TitleScreen && minecraft.gui.overlay() == null) {
                 ArcadeClient.open(screen);
-                if (PLAY) minecraft.gui.setScreen(new GameScreen(minecraft.gui.screen(), ArcadeClient.catalog().recommended().get(0)));
+                if (PLAY || PLAY_ONLY) minecraft.gui.setScreen(new GameScreen(minecraft.gui.screen(), ArcadeClient.catalog().recommended().get(0)));
+                if (PLAY_ONLY) Constants.LOG.info("[play] opened {}", ArcadeClient.catalog().recommended().get(0).title());
                 opened = true;
             }
             return;
         }
-        if (PLAY) {
-            if (screen instanceof GameScreen game) playTick(minecraft, game);
+        if (PLAY || PLAY_ONLY) {
+            if (screen instanceof GameScreen game) playTick(minecraft, game, shots);
             return;
         }
         if (!(screen instanceof ArcadeScreen arcade)) return;
@@ -62,13 +70,13 @@ final class DevScreenshot {
         shoot(minecraft, TARGET, "(" + arcade.thumbnailsReady() + " thumbnails loaded)", true);
     }
 
-    private static void playTick(Minecraft minecraft, GameScreen game) {
+    private static void playTick(Minecraft minecraft, GameScreen game, boolean shots) {
         ticks++;
         if (shotTick < 0) {
             // Chromium starting, then Open Doctrines' web build loading: wait for it to draw for a while.
             if (game.framesShown() < MIN_GAME_FRAMES && ticks < MAX_GAME_WAIT_TICKS) return;
             shotTick = ticks;
-            shoot(minecraft, TARGET, "(" + game.framesShown() + " frames from Chromium)", false);
+            if (shots) shoot(minecraft, TARGET, "(" + game.framesShown() + " frames from Chromium)", false);
             return;
         }
         double x = game.width * CLICK[0];
@@ -80,6 +88,10 @@ final class DevScreenshot {
             game.mouseClicked(click, false);
         } else if (ticks == shotTick + 28) {
             game.mouseReleased(click);
+            if (!shots) {
+                taken = true;
+                Constants.LOG.info("[play] clicked Run game; the game is yours");
+            }
         } else if (ticks == shotTick + 900) {
             taken = true;
             shoot(minecraft, TARGET.replaceFirst("(\\.png)?$", "-clicked.png"), "(" + game.framesShown() + " frames from Chromium)", true);
