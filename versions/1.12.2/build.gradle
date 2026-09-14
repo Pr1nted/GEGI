@@ -1,0 +1,91 @@
+// Minecraft 1.12.2, built with Unimined: Forge only (Fabric, NeoForge and Folia do not
+// exist for 1.12.2). One project compiles the shared client code on MCP's names and
+// remaps it to SRG for Forge. The folders are the same as every other version's
+// (common/, forge/), and so are the jars' places, so CI and port.json treat it like any
+// other port.
+plugins {
+    id 'java'
+    id 'xyz.wagyourtail.unimined' version '1.4.1'
+}
+
+base.archivesName = "${mod_id}-${minecraft_version}"
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(java_version)
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    if (Integer.parseInt(java_version) >= 9) options.release = Integer.parseInt(java_version)
+}
+
+sourceSets {
+    main {
+        java.srcDirs = ['common/src/main/java', '../../core/src/main/java']
+        resources.srcDirs = ['common/src/main/resources', '../../core/src/main/resources']
+    }
+    forge {
+        java.srcDirs = ['forge/src/main/java']
+        resources.srcDirs = ['forge/src/main/resources']
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+unimined.minecraft {
+    version minecraft_version
+    mappings {
+        searge()
+        mcp(mcp_channel, mcp_version)
+    }
+    defaultRemapJar = false
+}
+
+unimined.minecraft(sourceSets.forge) {
+    combineWith(sourceSets.main)
+    minecraftForge {
+        loader forge_version
+    }
+    defaultRemapJar = true
+}
+
+jar {
+    enabled = false
+}
+
+tasks.withType(Jar).configureEach {
+    // The remapped jar is made from the loader jar, which already has the licence.
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    from(rootProject.file('../../LICENSE')) {
+        rename { "${it}_${mod_name}" }
+    }
+}
+
+def expandProps = [
+        'version'          : version,
+        'minecraft_version': minecraft_version,
+        'mod_name'         : mod_name,
+        'mod_author'       : mod_author,
+        'mod_id'           : mod_id,
+        'description'      : project.description,
+        'credits'          : credits,
+]
+def jsonExpandProps = expandProps.collectEntries { key, value -> [(key): value instanceof String ? value.replace('\n', '\\\\n') : value] }
+
+tasks.named('processResources', ProcessResources) {
+    // The Chromium helper rides inside the jar and is unpacked on first play.
+    from(project(':browser').tasks.named('helperJar'))
+    filesMatching(['pack.mcmeta']) { expand jsonExpandProps }
+    inputs.properties(expandProps)
+}
+tasks.named('processForgeResources', ProcessResources) {
+    filesMatching(['mcmod.info', 'pack.mcmeta']) { expand jsonExpandProps }
+    inputs.properties(expandProps)
+}
+
+// Where CI looks for every version's jars: <loader>/build/libs/openarcade-<loader>-<minecraft>-<version>.jar
+['forge'].each { loader ->
+    tasks.matching { it.name == "remap${loader.capitalize()}Jar" }.configureEach {
+        archiveFileName = "${mod_id}-${loader}-${minecraft_version}-${version}.jar"
+        destinationDirectory = file("${loader}/build/libs")
+    }
+}

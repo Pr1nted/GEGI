@@ -7,7 +7,7 @@ recommended picks (Open Doctrines first), live shelves from itch.io, a search bo
 and a box for pasting any itch.io or Newgrounds link. Click a game and it plays right there, in
 Minecraft's window, keyboard and mouse included.
 
-Minecraft 26.2 · Fabric · Quilt · NeoForge · Forge · Folia (server plugin) · MIT
+Minecraft 1.12.2 to 26.2 · Fabric · Quilt · NeoForge · Forge · Folia (server plugin) · MIT
 
 ## Features
 
@@ -77,6 +77,19 @@ paste opens.
 | Forge | `openarcade-forge-26.2-<version>.jar` | Forge 65.1.3+ |
 | Folia / Paper | `openarcade-folia-26.2-<version>.jar` in `plugins/` | Folia or Paper 26.2 |
 
+Every other Minecraft version has the same jars with its own version in the name. One
+port per minor version, on its last release:
+
+| Minecraft | Java | Loaders |
+|---|---|---|
+| 26.2, 26.1.2, 1.21.11, 1.20.6 | 25 (26.x), 21 | Fabric, Quilt, NeoForge, Forge, Folia |
+| 1.19.4, 1.18.2, 1.17.1, 1.16.5 | 17, 17, 16, 8 | Fabric, Quilt, Forge, Folia |
+| 1.15.2, 1.14.4 | 8 | Fabric, Quilt, Forge |
+| 1.13.2, 1.12.2 | 8 | Forge |
+
+Loaders missing from a row did not exist for that Minecraft (NeoForge before 1.20.2,
+Fabric before 1.14), or publish no API that old (Paper's plugin API before 1.16.5).
+
 The mod is client-side: it does nothing on a dedicated server and is not needed there.
 
 ## Build
@@ -99,7 +112,13 @@ A version directory is [MultiLoader-Template](https://github.com/jaredlll08/Mult
 for that Minecraft, with a Forge module and a Folia module added, and a `port.json`
 that tells CI which loaders it has. Its `common/` holds only what that Minecraft's API
 needs: the screens draw the core's menu model, and the Options button, the command and
-the tick hook are mixins, which is why no loader API is needed.
+the tick hook are mixins, which is why no loader API is needed. Forge for 1.14.4 and
+older ships no Mixin, so there the same three hooks are Forge events (`ForgeEvents`).
+
+1.19.4 and older are one [Unimined](https://github.com/unimined/unimined) project per
+version instead, with the same folders. 1.13.2 and 1.12.2 have no Mojang names, so their
+code is written in Forge's (MCP), and 1.12.2 runs on LWJGL 2: its screens are written
+by hand rather than moved down from 1.14.4 by `ci/port/downport.py`.
 
 ## CI
 
@@ -107,7 +126,8 @@ the tick hook are mixins, which is why no loader API is needed.
 then **runs the real game** for each:
 
 - **Fabric, NeoForge, Forge.** The client starts headless with
-  [MC-Runtime-Test](https://github.com/headlesshq/mc-runtime-test) and joins a world.
+  [MC-Runtime-Test](https://github.com/headlesshq/mc-runtime-test) and joins a world
+  (1.12.2 included).
 - **Versions MC-Runtime-Test has no build for** (1.13 to 1.15). HeadlessMC starts the
   client with only Open Arcade installed, and the self-test creates its own world
   (`ci/client-selfdrive.sh`).
