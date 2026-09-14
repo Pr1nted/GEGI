@@ -104,7 +104,16 @@ jobs:
     env:
       OPENARCADE_SELFTEST: "1"
     steps:
-      - uses: actions/download-artifact@v5
+      # GitHub's artifact service sometimes answers 403 for a moment: one more try after a pause.
+      - id: jars
+        uses: actions/download-artifact@v5
+        continue-on-error: true
+        with:
+          name: jars-${{ matrix.minecraft }}
+      - if: steps.jars.outcome == 'failure'
+        run: sleep 60
+      - if: steps.jars.outcome == 'failure'
+        uses: actions/download-artifact@v5
         with:
           name: jars-${{ matrix.minecraft }}
       - uses: actions/setup-java@v5
@@ -152,7 +161,17 @@ jobs:
       - uses: actions/checkout@v5
         with:
           ref: ${{ inputs.ref }}
-      - uses: actions/download-artifact@v5
+      # GitHub's artifact service sometimes answers 403 for a moment: one more try after a pause.
+      - id: jars
+        uses: actions/download-artifact@v5
+        continue-on-error: true
+        with:
+          name: jars-${{ matrix.minecraft }}
+          path: jars
+      - if: steps.jars.outcome == 'failure'
+        run: sleep 60
+      - if: steps.jars.outcome == 'failure'
+        uses: actions/download-artifact@v5
         with:
           name: jars-${{ matrix.minecraft }}
           path: jars
@@ -183,7 +202,17 @@ jobs:
       - uses: actions/checkout@v5
         with:
           ref: ${{ inputs.ref }}
-      - uses: actions/download-artifact@v5
+      # GitHub's artifact service sometimes answers 403 for a moment: one more try after a pause.
+      - id: jars
+        uses: actions/download-artifact@v5
+        continue-on-error: true
+        with:
+          name: jars-${{ matrix.minecraft }}
+          path: jars
+      - if: steps.jars.outcome == 'failure'
+        run: sleep 60
+      - if: steps.jars.outcome == 'failure'
+        uses: actions/download-artifact@v5
         with:
           name: jars-${{ matrix.minecraft }}
           path: jars
@@ -212,7 +241,17 @@ jobs:
       - uses: actions/checkout@v5
         with:
           ref: ${{ inputs.ref }}
-      - uses: actions/download-artifact@v5
+      # GitHub's artifact service sometimes answers 403 for a moment: one more try after a pause.
+      - id: jars
+        uses: actions/download-artifact@v5
+        continue-on-error: true
+        with:
+          name: jars-${{ matrix.minecraft }}
+          path: jars
+      - if: steps.jars.outcome == 'failure'
+        run: sleep 60
+      - if: steps.jars.outcome == 'failure'
+        uses: actions/download-artifact@v5
         with:
           name: jars-${{ matrix.minecraft }}
           path: jars
