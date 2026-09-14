@@ -18,7 +18,7 @@ import java.util.Optional;
 import static net.pr1nted.openarcade.menu.ArcadeModel.*;
 
 /**
- * The arcade, drawn with 1.15.2's GUI. What it shows and what a click does is
+ * The arcade, drawn with 1.14.4's GUI. What it shows and what a click does is
  * {@link ArcadeModel}'s, shared with every other Minecraft version; this class is
  * only the widgets, the drawing and the input.
  */
@@ -134,8 +134,8 @@ public final class ArcadeScreen extends Screen {
     }
 
     private void scissor(int x1, int y1, int x2, int y2) {
-        double scale = this.minecraft.getWindow().getGuiScale();
-        int windowHeight = this.minecraft.getWindow().getHeight();
+        double scale = this.minecraft.window.getGuiScale();
+        int windowHeight = this.minecraft.window.getHeight();
         enableGlScissor((int) (x1 * scale), (int) (windowHeight - y2 * scale),
                 (int) ((x2 - x1) * scale), (int) ((y2 - y1) * scale));
     }

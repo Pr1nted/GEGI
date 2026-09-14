@@ -461,9 +461,23 @@ def to_1_15_2(path, text):
         t = t.replace(f"{fn}(graphics, ", f"{fn}(")
     t = t.replace("private void drawThumbnail(PoseStack graphics, ", "private void drawThumbnail(")
     t = t.replace("plainSubstrByWidth(", "substrByWidth(")
+    # RenderSystem has no scissor before 1.16: clip with OpenGL directly.
+    t = t.replace("import com.mojang.blaze3d.systems.RenderSystem;\n", "import org.lwjgl.opengl.GL11;\n")
+    t = t.replace("RenderSystem.enableScissor(", "enableGlScissor(")
+    t = t.replace("RenderSystem.disableScissor();", "GL11.glDisable(GL11.GL_SCISSOR_TEST);")
+    t = t.replace("GuiComponent had no scissor yet: RenderSystem's takes window pixels, from the bottom.",
+                  "RenderSystem has no scissor yet: OpenGL's takes window pixels, from the bottom.")
+    if "enableGlScissor(" in t:
+        t = t.replace("    private void scissor(int x1, int y1, int x2, int y2) {",
+                      "    private static void enableGlScissor(int x, int y, int width, int height) {\n"
+                      "        GL11.glEnable(GL11.GL_SCISSOR_TEST);\n"
+                      "        GL11.glScissor(x, y, width, height);\n"
+                      "    }\n\n"
+                      "    private void scissor(int x1, int y1, int x2, int y2) {", 1)
+
     # String labels
     t = sub(t, r"new Button\(([^;]*?), new TextComponent\(([^;]*?)\), ", r"new Button(\1, \2, ")
-    t = sub(t, r"new Button\(([^;]*?), Lang\.text\(", r"new Button(\1, Lang.string(")
+    t = sub(t, r"new Button\(([^;]*?),(\s*)Lang\.text\(", r"new Button(\1,\2Lang.string(")
     t = t.replace("CommonComponents.GUI_DONE", 'net.minecraft.client.resources.language.I18n.get("gui.done")')
     t = t.replace("import net.minecraft.network.chat.CommonComponents;\n", "")
     # Mod Menu before 2.0 (1.16 and older) kept its API under io.github.prospector.
@@ -491,6 +505,53 @@ def to_1_15_2(path, text):
 
 
 ERAS[("1.16.5", "1.15.2")] = to_1_15_2
+
+
+# ---- 1.15.2 -> 1.14.4 --------------------------------------------------------------
+# The API the mod uses is 1.15.2's (which already clips with OpenGL's scissor).
+# Mod Menu 1.7 is published as io.github.prospector.
+
+MODMENU_1_7 = """package net.pr1nted.openarcade.fabric;
+
+import io.github.prospector.modmenu.api.ModMenuApi;
+import net.minecraft.client.gui.screens.Screen;
+import net.pr1nted.openarcade.Constants;
+import net.pr1nted.openarcade.client.ArcadeClient;
+
+import java.util.function.Function;
+
+/** Mod Menu's Config button opens the arcade. Mod Menu 1.7 names the mod and returns a plain factory. */
+public final class ModMenuIntegration implements ModMenuApi {
+    @Override
+    public String getModId() {
+        return Constants.MOD_ID;
+    }
+
+    @Override
+    public Function<Screen, ? extends Screen> getConfigScreenFactory() {
+        return ArcadeClient::screen;
+    }
+}
+"""
+
+
+def to_1_14_4(path, text):
+    name = os.path.basename(path)
+    t = text
+    # No Minecraft.getWindow() yet: the window is the public field.
+    t = t.replace(".getWindow()", ".window")
+    if name == "ModMenuIntegration.java":
+        # Mod Menu 1.7: getModId() is required, and the factory is a plain Function.
+        t = MODMENU_1_7
+    # No RenderSystem at all in 1.14.4: drop an import that nothing uses any more.
+    if "RenderSystem." not in t:
+        t = t.replace("import com.mojang.blaze3d.systems.RenderSystem;\n", "")
+    if name in ("ArcadeScreen.java", "GameScreen.java"):
+        t = t.replace("drawn with 1.15.2's GUI", "drawn with 1.14.4's GUI")
+    return t
+
+
+ERAS[("1.15.2", "1.14.4")] = to_1_14_4
 
 
 def set_property(text, name, value):
@@ -581,6 +642,14 @@ def main():
                 text = open(path, encoding="utf-8").read()
                 open(path, "w", encoding="utf-8").write(
                     re.sub(r'"compatibilityLevel":\s*"[^"]*"', f'"compatibilityLevel": "{level}"', text))
+
+    # Mod Menu 1.7 and older (Minecraft 1.14) is published as io.github.prospector:modmenu.
+    if versions.key(target) < [1, 15]:
+        build_file = os.path.join(dst, "build.gradle")
+        if os.path.isfile(build_file):
+            text = open(build_file, encoding="utf-8").read()
+            open(build_file, "w", encoding="utf-8").write(text.replace('"com.terraformersmc:modmenu:', '"io.github.prospector:modmenu:')
+                                                          .replace("includeGroup 'com.terraformersmc'", "includeGroup 'io.github.prospector'"))
 
     changed = []
     for base, _, files in os.walk(dst):

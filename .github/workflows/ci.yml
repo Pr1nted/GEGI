@@ -88,7 +88,9 @@ jobs:
 
   client:
     needs: [plan, build]
-    if: needs.plan.outputs.clients != '[]'
+    # Every version's clients run even when another version's build failed; a version whose
+    # own build failed has no jars, so only its legs fail.
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.plan.outputs.clients != '[]' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     strategy:
@@ -131,7 +133,7 @@ jobs:
 
   selfdrive:
     needs: [plan, build]
-    if: needs.plan.outputs.selfdrive != '[]'
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.plan.outputs.selfdrive != '[]' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     strategy:
@@ -164,7 +166,7 @@ jobs:
 
   quilt:
     needs: [plan, build]
-    if: needs.plan.outputs.quilt != '[]'
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.plan.outputs.quilt != '[]' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     strategy:
@@ -195,7 +197,7 @@ jobs:
 
   folia:
     needs: [plan, build]
-    if: needs.plan.outputs.folia != '[]'
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.plan.outputs.folia != '[]' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     strategy:

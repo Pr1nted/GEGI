@@ -1,0 +1,16 @@
+{
+  "minecraft": "1.14.4",
+  "java": 8,
+  "clients": [
+    {
+      "loader": "fabric",
+      "mcrt": "none"
+    },
+    {
+      "loader": "forge",
+      "mcrt": "none"
+    }
+  ],
+  "quilt": true,
+  "folia": false
+}

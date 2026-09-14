@@ -1,0 +1,151 @@
+// Minecraft 1.19.4, built with Unimined: one project compiles the shared client code
+// once, on Mojang's names, and remaps it for Fabric (intermediary) and Forge (SRG).
+// NeoForge does not exist for this Minecraft. The folders are the same as every other
+// version's (common/, fabric/, forge/, folia/), and so are the jars' places, so CI and
+// port.json treat it like any other port.
+plugins {
+    id 'java'
+    id 'xyz.wagyourtail.unimined' version '1.4.1'
+}
+
+base.archivesName = "${mod_id}-${minecraft_version}"
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(java_version)
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    if (Integer.parseInt(java_version) >= 9) options.release = Integer.parseInt(java_version)
+}
+
+sourceSets {
+    main {
+        java.srcDirs = ['common/src/main/java', '../../core/src/main/java']
+        resources.srcDirs = ['common/src/main/resources', '../../core/src/main/resources']
+    }
+    fabric {
+        java.srcDirs = ['fabric/src/main/java']
+        resources.srcDirs = ['fabric/src/main/resources']
+    }
+    forge {
+        java.srcDirs = ['forge/src/main/java']
+        resources.srcDirs = ['forge/src/main/resources']
+    }
+}
+
+repositories {
+    mavenCentral()
+    maven {
+        name = 'Sponge'
+        url = 'https://repo.spongepowered.org/repository/maven-public/'
+    }
+    maven {
+        name = 'TerraformersMC'
+        url = 'https://maven.terraformersmc.com/releases/'
+        content { includeGroup 'io.github.prospector' }
+    }
+}
+
+configurations {
+    mainImplementation
+    fabricModCompileOnly
+    // What mods.remap turns into Mojang's names is what the Fabric code compiles against.
+    fabricCompileOnly.extendsFrom fabricModCompileOnly
+    implementation {
+        extendsFrom forgeImplementation
+        extendsFrom fabricImplementation
+    }
+}
+sourceSets.main.compileClasspath += configurations.mainImplementation
+
+unimined.minecraft {
+    version minecraft_version
+    mappings {
+        intermediary()
+        mojmap()
+    }
+    defaultRemapJar = false
+}
+
+unimined.minecraft(sourceSets.fabric) {
+    combineWith(sourceSets.main)
+    fabric {
+        loader fabric_loader_version
+    }
+    mods {
+        // Mod Menu is optional: compiled against, never bundled, never required.
+        remap(configurations.fabricModCompileOnly)
+    }
+    defaultRemapJar = true
+}
+
+unimined.minecraft(sourceSets.forge) {
+    combineWith(sourceSets.main)
+    minecraftForge {
+        loader forge_version
+        // No mixin configs: Forge 28 ships no Mixin, and with a Mixin mod installed they would
+        // add a second button and a second tick next to the Forge events that do the work.
+    }
+    defaultRemapJar = true
+}
+
+dependencies {
+    mainImplementation 'org.spongepowered:mixin:0.8.5'
+    mainImplementation 'org.ow2.asm:asm-tree:9.5'
+    fabricModCompileOnly("io.github.prospector:modmenu:${modmenu_version}") {
+        transitive = false
+    }
+}
+
+jar {
+    enabled = false
+}
+
+tasks.withType(Jar).configureEach {
+    // The remapped jar is made from the loader jar, which already has the licence.
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    from(rootProject.file('../../LICENSE')) {
+        rename { "${it}_${mod_name}" }
+    }
+}
+
+def expandProps = [
+        'version'                   : version,
+        'group'                     : project.group,
+        'minecraft_version'         : minecraft_version,
+        'minecraft_version_range'   : minecraft_version_range,
+        'fabric_version'            : fabric_version,
+        'fabric_loader_version'     : fabric_loader_version,
+        'mod_name'                  : mod_name,
+        'mod_author'                : mod_author,
+        'mod_id'                    : mod_id,
+        'license'                   : license,
+        'description'               : project.description,
+        'forge_version'             : forge_version,
+        'forge_loader_version_range': forge_loader_version_range,
+        'credits'                   : credits,
+        'java_version'              : java_version
+]
+def jsonExpandProps = expandProps.collectEntries { key, value -> [(key): value instanceof String ? value.replace('\n', '\\\\n') : value] }
+
+tasks.named('processResources', ProcessResources) {
+    // The Chromium helper rides inside the jar and is unpacked on first play.
+    from(project(':browser').tasks.named('helperJar'))
+    filesMatching(['pack.mcmeta', '*.mixins.json']) { expand jsonExpandProps }
+    inputs.properties(expandProps)
+}
+tasks.named('processFabricResources', ProcessResources) {
+    filesMatching(['fabric.mod.json', '*.mixins.json']) { expand jsonExpandProps }
+    inputs.properties(expandProps)
+}
+tasks.named('processForgeResources', ProcessResources) {
+    filesMatching(['META-INF/mods.toml']) { expand expandProps }
+    filesMatching(['*.mixins.json', 'pack.mcmeta']) { expand jsonExpandProps }
+    inputs.properties(expandProps)
+}
+
+// Where CI looks for every version's jars: <loader>/build/libs/openarcade-<loader>-<minecraft>-<version>.jar
+['fabric', 'forge'].each { loader ->
+    tasks.matching { it.name == "remap${loader.capitalize()}Jar" }.configureEach {
+        archiveFileName = "${mod_id}-${loader}-${minecraft_version}-${version}.jar"
+        destinationDirectory = file("${loader}/build/libs")
+    }
+}

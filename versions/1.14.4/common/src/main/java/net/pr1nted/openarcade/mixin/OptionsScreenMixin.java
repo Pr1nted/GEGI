@@ -30,9 +30,7 @@ public abstract class OptionsScreenMixin extends Screen implements OptionsButton
 
     @Inject(method = "init", at = @At("TAIL"))
     private void openarcade$addButton(CallbackInfo ci) {
-        Screen self = this;
-        openarcade$button = this.addButton(new Button(this.width - 108, 8, 100, 20, 
-                        Lang.string("openarcade.button"), button -> ArcadeClient.open(self)));
+        openarcade$button = this.addButton(ArcadeClient.optionsButtonFor(this));
     }
 
 
