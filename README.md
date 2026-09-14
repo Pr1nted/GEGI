@@ -81,26 +81,35 @@ The mod is client-side: it does nothing on a dedicated server and is not needed 
 
 ## Build
 
-Java 25.
+Every Minecraft version is its own Gradle build under `versions/<minecraft>/`, with
+its own Gradle, plugins and Java, because the tools for 1.12.2 and for 26.2 cannot
+share one build. They all compile the same `core/` (Java 8, no Minecraft classes: the
+catalog, itch.io feeds, link allowlist, strings, the menu's model and the game's side
+of Chromium) and bundle the same `browser/` helper.
 
 ```bash
+cd versions/26.2
 ./gradlew build
 ```
 
-Jars land in `<loader>/build/libs/`. The project is
-[MultiLoader-Template](https://github.com/jaredlll08/MultiLoader-Template) with a Forge
-module and a Folia module added. Shared code lives in `common/` and uses only vanilla
-Minecraft: the Options button, the command and the tick hook are mixins, which is why
-no loader API is needed.
+Jars land in `versions/<minecraft>/<loader>/build/libs/`. The core and the helper also
+build on their own from the top: `./gradlew :core:test :browser:smokeTest`.
+
+A version directory is [MultiLoader-Template](https://github.com/jaredlll08/MultiLoader-Template)
+for that Minecraft, with a Forge module and a Folia module added, and a `port.json`
+that tells CI which loaders it has. Its `common/` holds only what that Minecraft's API
+needs: the screens draw the core's menu model, and the Options button, the command and
+the tick hook are mixins, which is why no loader API is needed.
 
 ## CI
 
-`.github/workflows/ci.yml` builds every loader, then **runs the real game**:
+`.github/workflows/ci.yml` reads every `versions/*/port.json`, builds each version's loaders,
+then **runs the real game** for each:
 
-- **Fabric, NeoForge, Forge.** The 26.2 client starts headless with
+- **Fabric, NeoForge, Forge.** The client starts headless with
   [MC-Runtime-Test](https://github.com/headlesshq/mc-runtime-test) and joins a world.
 - **Quilt.** The same, installed with the Quilt installer (`ci/quilt-runtime.sh`).
-- **Folia.** A Folia 26.2 server starts with the plugin and must log that it is enabled
+- **Folia.** A Folia server of that version starts with the plugin and must log that it is enabled
   (`ci/folia-smoke.sh`).
 
 In the client jobs the mod runs its own self-test in the world

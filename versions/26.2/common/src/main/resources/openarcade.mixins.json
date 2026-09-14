@@ -2,7 +2,7 @@
   "required": true,
   "minVersion": "0.8",
   "package": "net.pr1nted.openarcade.mixin",
-  "compatibilityLevel": "JAVA_25",
+  "compatibilityLevel": "JAVA_${java_version}",
   "mixins": [],
   "client": [
     "ClientPacketListenerMixin",

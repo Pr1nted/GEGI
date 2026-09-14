@@ -1,32 +1,11 @@
-pluginManagement {
-    repositories {
-        gradlePluginPortal()
-        mavenCentral()
-        exclusiveContent {
-            forRepository {
-                maven {
-                    name = 'Fabric'
-                    url = uri('https://maven.fabricmc.net')
-                }
-            }
-            filter {
-                includeGroupAndSubgroups('net.fabricmc')
-            }
-        }
-    }
-}
-
+// The version-independent half of Open Arcade, buildable and testable on its own:
+//   ./gradlew :core:test :browser:smokeTest
+// Each Minecraft version is its own build under versions/<minecraft>/, with its own
+// Gradle, plugins and Java, and includes these two projects from here.
 plugins {
     id 'org.gradle.toolchains.foojay-resolver-convention' version '1.0.0'
 }
 
-// This should match the folder name of the project, or else IDEA may complain (see https://youtrack.jetbrains.com/issue/IDEA-317606)
 rootProject.name = 'Open-Arcade'
-includeBuild('build-logic')
 include('core')
-include('common')
-include('fabric')
-include('neoforge')
-include('forge')
-include('folia')
 include('browser')

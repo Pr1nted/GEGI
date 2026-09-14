@@ -1,78 +1,107 @@
-# Open Arcade CI: every loader, launched for real.
+# Open Arcade CI: every Minecraft version, every loader, launched for real.
 #
-#   build    compile every loader and the Folia plugin; upload the jars
-#   client   start the actual Minecraft 26.2 client, headless, on Fabric, NeoForge
-#            and Forge with the mod installed (headlesshq/mc-runtime-test). The
-#            test mod joins a world and quits. With OPENARCADE_SELFTEST=1 the mod
-#            also opens its own menu, checks the Options button and the /arcade
-#            command, and crashes the game if any of it fails, so a pass means
-#            the menu works, not just that the jar loaded.
-#   quilt    the same, on Quilt, which the action does not install
-#   folia    a Folia 26.2 server starts with the plugin enabled
-#   chromium the in-game browser without Minecraft, on Linux, Windows and macOS and on
-#            Java 8 and 25: Chromium downloads, a page loads, and a click, a key, a
-#            typed character and a resize all reach it (:browser:smokeTest)
+#   plan      read versions/*/port.json; every job below is a matrix over them, so a
+#             new port is a new directory and nothing here changes
+#   build     compile each version's loaders and Folia plugin (and the shared core,
+#             with its unit tests); upload the jars
+#   client    start the actual Minecraft client, headless, on each version's loaders
+#             with the mod installed (headlesshq/mc-runtime-test). With
+#             OPENARCADE_SELFTEST=1 the mod opens its own menu, checks the Options
+#             button and the /arcade command, and crashes the game if any of it
+#             fails, so a pass means the menu works, not just that the jar loaded
+#   quilt     the same, on Quilt, which the action does not install
+#   folia     a Folia server starts with the plugin enabled
+#   chromium  the in-game browser without Minecraft, on Linux, Windows and macOS and on
+#             Java 8 and 25: Chromium downloads, a page loads, and a click, a key, a
+#             typed character and a resize all reach it (:browser:smokeTest)
 name: CI
 
 on:
   push:
   pull_request:
   workflow_dispatch:
+    inputs:
+      minecraft:
+        description: Only this version (empty for all)
+        required: false
+  workflow_call:
+    inputs:
+      minecraft:
+        type: string
+        required: false
+      ref:
+        description: The branch to test (the port workflow tests its port branch)
+        type: string
+        required: false
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.ref }}-${{ inputs.ref || 'self' }}-${{ inputs.minecraft || 'all' }}
   cancel-in-progress: true
 
-env:
-  MC_VERSION: "26.2"
-  JAVA_VERSION: "25"
-
 jobs:
-  build:
+  plan:
     runs-on: ubuntu-24.04
+    outputs:
+      versions: ${{ steps.plan.outputs.versions }}
+      clients: ${{ steps.plan.outputs.clients }}
+      quilt: ${{ steps.plan.outputs.quilt }}
+      folia: ${{ steps.plan.outputs.folia }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref }}
+      - id: plan
+        env:
+          OPENARCADE_ONLY_VERSION: ${{ inputs.minecraft }}
+        run: python3 ci/plan.py
+
+  build:
+    needs: plan
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJson(needs.plan.outputs.versions) }}
+    name: build (${{ matrix.minecraft }})
+    defaults:
+      run:
+        working-directory: versions/${{ matrix.minecraft }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref }}
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: ${{ env.JAVA_VERSION }}
+          java-version: ${{ matrix.java }}
       - uses: gradle/actions/setup-gradle@v5
       - name: Build every loader
         run: ./gradlew build --console=plain
       - uses: actions/upload-artifact@v4
         with:
-          name: jars
-          path: |
-            fabric/build/libs/openarcade-fabric-*.jar
-            neoforge/build/libs/openarcade-neoforge-*.jar
-            forge/build/libs/openarcade-forge-*.jar
-            folia/build/libs/openarcade-folia-*.jar
+          name: jars-${{ matrix.minecraft }}
+          path: versions/${{ matrix.minecraft }}/*/build/libs/openarcade-*.jar
           if-no-files-found: error
 
   client:
-    needs: build
+    needs: [plan, build]
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - loader: fabric
-            mcrt: fabric
-          - loader: neoforge
-            mcrt: neoforge
-          - loader: forge
-            mcrt: lexforge
+        include: ${{ fromJson(needs.plan.outputs.clients) }}
+    name: client (${{ matrix.minecraft }}, ${{ matrix.loader }})
     env:
       OPENARCADE_SELFTEST: "1"
     steps:
       - uses: actions/download-artifact@v5
         with:
-          name: jars
+          name: jars-${{ matrix.minecraft }}
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: ${{ env.JAVA_VERSION }}
+          java-version: ${{ matrix.java }}
       - name: Install the mod
         run: |
           mkdir -p run/mods
@@ -83,58 +112,74 @@ jobs:
       - name: Run the ${{ matrix.loader }} client
         uses: headlesshq/mc-runtime-test@4.5.1
         with:
-          mc: ${{ env.MC_VERSION }}
+          mc: ${{ matrix.minecraft }}
           modloader: ${{ matrix.loader }}
           regex: .*${{ matrix.loader }}.*
-          java: ${{ env.JAVA_VERSION }}
+          java: ${{ matrix.java }}
           mc-runtime-test: ${{ matrix.mcrt }}
       # A launch that joins a world and quits is not a pass by itself: the mod's
       # self-test writes this file only after /arcade, the Options button and the
       # menu all worked. No file, no pass.
       - name: The self-test ran and passed
         run: |
-          test -f run/openarcade-selftest-passed || { echo "::error::Open Arcade's in-game self-test did not pass on ${{ matrix.loader }}"; exit 1; }
-          echo "self-test passed on ${{ matrix.loader }}"
+          test -f run/openarcade-selftest-passed || { echo "::error::Open Arcade's in-game self-test did not pass on ${{ matrix.minecraft }} ${{ matrix.loader }}"; exit 1; }
+          echo "self-test passed on ${{ matrix.minecraft }} ${{ matrix.loader }}"
 
   quilt:
-    needs: build
+    needs: [plan, build]
+    if: needs.plan.outputs.quilt != '[]'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJson(needs.plan.outputs.quilt) }}
+    name: quilt (${{ matrix.minecraft }})
     env:
       OPENARCADE_SELFTEST: "1"
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref }}
       - uses: actions/download-artifact@v5
         with:
-          name: jars
+          name: jars-${{ matrix.minecraft }}
           path: jars
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: ${{ env.JAVA_VERSION }}
+          java-version: ${{ matrix.java }}
       - uses: actions/cache@v4
         with:
           path: ~/.minecraft
-          key: ${{ runner.os }}-${{ env.MC_VERSION }}-quilt-hmc
+          key: ${{ runner.os }}-${{ matrix.minecraft }}-quilt-hmc
       - name: Run the Quilt client
-        run: ci/quilt-runtime.sh "$MC_VERSION" jars/fabric/build/libs
+        run: ci/quilt-runtime.sh "${{ matrix.minecraft }}" jars/fabric/build/libs
 
   folia:
-    needs: build
+    needs: [plan, build]
+    if: needs.plan.outputs.folia != '[]'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJson(needs.plan.outputs.folia) }}
+    name: folia (${{ matrix.minecraft }})
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref }}
       - uses: actions/download-artifact@v5
         with:
-          name: jars
+          name: jars-${{ matrix.minecraft }}
           path: jars
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: ${{ env.JAVA_VERSION }}
+          java-version: ${{ matrix.java }}
       - name: Start Folia with the plugin
-        run: ci/folia-smoke.sh "$MC_VERSION" jars/folia/build/libs
+        run: ci/folia-smoke.sh "${{ matrix.minecraft }}" jars/folia/build/libs
 
   chromium:
     runs-on: ${{ matrix.os }}
@@ -153,6 +198,8 @@ jobs:
             java: "25"
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref }}
       - uses: actions/setup-java@v5
         id: smoke-java
         with:
@@ -161,7 +208,7 @@ jobs:
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: ${{ env.JAVA_VERSION }}
+          java-version: "25"
       - uses: gradle/actions/setup-gradle@v5
       # Chromium is ~100 MB; the mod downloads it once per player, CI once per OS.
       - uses: actions/cache@v4
@@ -170,7 +217,7 @@ jobs:
           key: chromium-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('browser/build.gradle') }}
       - name: Drive the helper (Linux, under a virtual display)
         if: runner.os == 'Linux'
-        run: xvfb-run -a ./gradlew :browser:smokeTest --console=plain "-PsmokeJavaHome=${{ steps.smoke-java.outputs.path }}" "-PsmokeInstall=${{ runner.temp }}/openarcade-chromium"
+        run: xvfb-run -a ./gradlew :core:test :browser:smokeTest --console=plain "-PsmokeJavaHome=${{ steps.smoke-java.outputs.path }}" "-PsmokeInstall=${{ runner.temp }}/openarcade-chromium"
       - name: Drive the helper
         if: runner.os != 'Linux'
         run: ./gradlew :browser:smokeTest --console=plain "-PsmokeJavaHome=${{ steps.smoke-java.outputs.path }}" "-PsmokeInstall=${{ runner.temp }}/openarcade-chromium"
