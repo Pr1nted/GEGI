@@ -15,6 +15,8 @@ Good Enough Game Integration (GEGI) adds a menu of web games to Minecraft. Pick 
 - A box for **pasting any itch.io or Newgrounds game link**
 - **Browse sites**, which links to the itch.io and Newgrounds game pages
 
+Games that label themselves as adult (18+, NSFW and the like) are left off the shelves. itch.io's feeds carry no age rating, so this relies on what a game says about itself.
+
 ## Games run inside Minecraft
 
 GEGI plays web games in its own copy of Chromium, drawn into a Minecraft screen. Every key, click and scroll goes to the game. Escape belongs to the game too: **press it twice to leave**. **Open in browser** is always one click away.

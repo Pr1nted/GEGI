@@ -13,7 +13,9 @@ Minecraft 1.12.2 to 26.2 · Fabric · Quilt · NeoForge · Forge · Folia (serve
 
 - **The menu.** Recommended, Popular, Newest, Free and Strategy tabs read from
   itch.io's own browse feeds, with thumbnails. A Browse sites tab links to the itch.io
-  and Newgrounds game pages. Search filters the current tab.
+  and Newgrounds game pages. Search filters the current tab. Games that label themselves
+  as adult (18+, NSFW and the like) are left off the shelves; itch.io's feeds carry no age
+  rating, so this relies on what a game says about itself.
 - **Games run in the game.** GEGI carries its own Chromium: the page draws
   into a Minecraft screen and every key, click and scroll goes to it. Escape belongs to
   the game you are playing; press it twice to leave. *Open in browser* is always one
