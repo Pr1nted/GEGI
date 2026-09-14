@@ -1,0 +1,29 @@
+plugins {
+    id 'java'
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(java_version)
+
+base {
+    archivesName = "${mod_id}-folia-${minecraft_version}"
+}
+
+repositories {
+    maven { url = 'https://repo.papermc.io/repository/maven-public/' }
+    mavenCentral()
+}
+
+dependencies {
+    compileOnly "io.papermc.paper:paper-api:${paper_api_version}"
+}
+
+processResources {
+    inputs.property('version', version)
+    // The same catalog the client mod ships, so both recommend the same games.
+    from(project(':core').file('src/main/resources/assets/openarcade/catalog.json')) {
+        into 'openarcade'
+    }
+    filesMatching('plugin.yml') {
+        expand('version': version, 'minecraft_version': minecraft_version, 'description': project.description)
+    }
+}

@@ -12,14 +12,15 @@ plugins {
 java.toolchain.languageVersion = JavaLanguageVersion.of(java_version)
 
 tasks.named('compileJava', JavaCompile) {
-    options.release = 8
+    // JDK 8's javac has no --release; its own output is already Java 8.
+    if (Integer.parseInt(java_version) >= 9) options.release = 8
     options.encoding = 'UTF-8'
     options.compilerArgs += ['-Xlint:-options']
 }
 
 // The tests are not shipped, so they may use today's Java.
 tasks.named('compileTestJava', JavaCompile) {
-    options.release = Integer.parseInt(java_version)
+    if (Integer.parseInt(java_version) >= 9) options.release = Integer.parseInt(java_version)
     options.encoding = 'UTF-8'
 }
 
@@ -35,6 +36,13 @@ dependencies {
     testImplementation('org.junit.jupiter:junit-jupiter')
     testRuntimeOnly('org.junit.platform:junit-platform-launcher')
     testRuntimeOnly('com.google.code.gson:gson:2.8.0')
+}
+
+// The tests use today's Java (text blocks); a build on an older toolchain, for an old
+// Minecraft, leaves them to the builds that can run them.
+if (Integer.parseInt(java_version) < 17) {
+    tasks.named('compileTestJava') { enabled = false }
+    tasks.named('test') { enabled = false }
 }
 
 tasks.named('test', Test) {

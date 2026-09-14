@@ -183,6 +183,10 @@ def to_1_19_4(path, text):
     t = t.replace("graphics.disableScissor()", "disableScissor()")
     # graphics.blit(id, rest...) -> bind id, then GuiComponent.blit(pose, rest...)
     t = sub(t, r"(\n(\s*))graphics\.blit\(([^,]+),\s*", r"\1RenderSystem.setShaderTexture(0, \3);\1blit(graphics, ")
+    # OptionsScreen overrides repositionElements only from 1.20; before, a resize re-runs init,
+    # which places the button anyway, and an @Inject into the inherited method finds no target.
+    if name == "OptionsScreenMixin.java":
+        t = sub(t, r"\n    @Inject\(method = \"repositionElements\".*?\n    }\n", "\n", flags=re.S)
     # One scroll amount, the vertical one (the horizontal one came in 1.20.2).
     t = t.replace("public boolean mouseScrolled(double x, double y, double scrollX, double scrollY) {",
                   "public boolean mouseScrolled(double x, double y, double scrollY) {\n        double scrollX = 0; // 1.19.4 reports one wheel, the vertical one")
@@ -243,8 +247,6 @@ public abstract class ClientPacketListenerMixin {
 """
     if name == "SelfTest.java":
         t = t.replace('minecraft.player.connection.sendCommand("arcade");', 'minecraft.player.chat("/arcade");')
-    if name == "OptionsScreenMixin.java":
-        t = sub(t, r"\n    @Inject\(method = \"repositionElements\".*?\n    }\n", "\n", flags=re.S)
     if name == "ArcadeScreen.java":
         t = t.replace("this.rebuildWidgets();", "this.clearWidgets();\n                        this.init();")
         t = sub(t, r"\n(\s*)(\w+)\.setHint\(([^;]*)\);", r'\n\1\2.setSuggestion(\2.getValue().isEmpty() ? \3.getString() : "");')
@@ -290,8 +292,205 @@ def to_1_17_1(path, text):
     return t
 
 
+# ---- 1.17.1 -> 1.16.5 --------------------------------------------------------------
+# Java 8: no records, pattern-matching instanceof, arrow switches, List.of/Set.of,
+# strip/isBlank, Path.of or Files.writeString. And 1.16.5's API: log4j instead of
+# slf4j, addButton, the widget lists as fields, a texture is bound through the texture
+# manager (no shader textures yet), a screenshot is sized by hand, and Forge 36's
+# config screen is an ExtensionPoint.
+
+def _java8_instanceof(t):
+    t = re.sub(r"\n(\s*)if \(!\((\w+) instanceof ([A-Z][\w.]*) (\w+)\)\) return;",
+               lambda m: f"\n{m.group(1)}if (!({m.group(2)} instanceof {m.group(3)})) return;\n{m.group(1)}{m.group(3)} {m.group(4)} = ({m.group(3)}) {m.group(2)};", t)
+    t = re.sub(r"\n(\s*)if \((\w+) instanceof ([A-Z][\w.]*) (\w+) && \4 instanceof ([A-Z][\w.]*) (\w+)\) \{",
+               lambda m: (f"\n{m.group(1)}if ({m.group(2)} instanceof {m.group(3)} && {m.group(2)} instanceof {m.group(5)}) {{"
+                          f"\n{m.group(1)}    {m.group(3)} {m.group(4)} = ({m.group(3)}) {m.group(2)};"
+                          f"\n{m.group(1)}    {m.group(5)} {m.group(6)} = ({m.group(5)}) (Object) {m.group(2)};"), t)
+
+    def cond(m):
+        ind, e, typ, v, rest = m.group(1), m.group(2), m.group(3), m.group(4), m.group(5)
+        rest = re.sub(rf"\b{v}\.", f"(({typ}) {e}).", rest)
+        return f"\n{ind}if ({e} instanceof {typ} && {rest}) {{\n{ind}    {typ} {v} = ({typ}) {e};"
+    t = re.sub(r"\n(\s*)if \((\w+) instanceof ([A-Z][\w.]*) (\w+) && (.*?)\) \{", cond, t, flags=re.S)
+    t = re.sub(r"\n(\s*)if \((\w+) instanceof ([A-Z][\w.]*) (\w+)\) ([^\n{]+;)",
+               lambda m: (f"\n{m.group(1)}if ({m.group(2)} instanceof {m.group(3)}) {{"
+                          f"\n{m.group(1)}    {m.group(3)} {m.group(4)} = ({m.group(3)}) {m.group(2)};"
+                          f"\n{m.group(1)}    {m.group(5)}\n{m.group(1)}}}"), t)
+    return t
+
+
+def _java8_switch(t):
+    t = re.sub(r"\n(\s*)case (\w+) -> \{ \}", r"\n\1case \2:\n\1    break;", t)
+    t = re.sub(r"\n(\s*)case (\w+) -> \{(.*?)\n\1\}",
+               lambda m: f"\n{m.group(1)}case {m.group(2)}: {{{m.group(3)}\n{m.group(1)}}}\n{m.group(1)}break;", t, flags=re.S)
+    return t
+
+
+def _java8_records(t):
+    """A one-line record, `record Name(A a, B b) {}`, as the class Java 8 needs, with the same accessors."""
+    def cls(m):
+        ind, mods, name, params = m.group(1), m.group(2) or "", m.group(3), m.group(4)
+        fields = [p.strip().rsplit(" ", 1) for p in params.split(",") if p.strip()]
+        lines = [f"{ind}{mods}static final class {name} {{"]
+        lines += [f"{ind}    private final {typ} {var};" for typ, var in fields]
+        lines += ["", f"{ind}    {name}({params}) {{"]
+        lines += [f"{ind}        this.{var} = {var};" for _, var in fields]
+        lines += [f"{ind}    }}"]
+        for typ, var in fields:
+            lines += ["", f"{ind}    {typ} {var}() {{", f"{ind}        return {var};", f"{ind}    }}"]
+        lines += [f"{ind}}}"]
+        return "\n".join(lines)
+    return re.sub(r"^([ \t]*)((?:private |public |protected )?)(?:static )?record (\w+)\(([^)]*)\) \{\}", cls, t, flags=re.M)
+
+
+def to_1_16_5(path, text):
+    name = os.path.basename(path)
+    t = _java8_records(text)
+    # Java 8
+    t = t.replace('Set.of("arcade", "openarcade")',
+                  'java.util.Collections.unmodifiableSet(new java.util.HashSet<>(java.util.Arrays.asList("arcade", "openarcade")))')
+    t = t.replace("command.strip()", "command.trim()")
+    t = t.replace("TARGET.isBlank()", "TARGET.trim().isEmpty()")
+    t = t.replace("Path.of(", "java.nio.file.Paths.get(")
+    t = t.replace('SELF_TEST ? List.of("McRuntimeTestMixin") : List.of()',
+                  'SELF_TEST ? java.util.Collections.singletonList("McRuntimeTestMixin") : java.util.Collections.<String>emptyList()')
+    t = re.sub(r'Files\.writeString\((.*?), ("[^"]*")\);', r"Files.write(\1, \2.getBytes(java.nio.charset.StandardCharsets.UTF_8));", t)
+    t = t.replace("    record Ready(ResourceLocation id, int width, int height) {}",
+                  """    static final class Ready {
+        private final ResourceLocation id;
+        private final int width;
+        private final int height;
+
+        Ready(ResourceLocation id, int width, int height) {
+            this.id = id;
+            this.width = width;
+            this.height = height;
+        }
+
+        ResourceLocation id() {
+            return id;
+        }
+
+        int width() {
+            return width;
+        }
+
+        int height() {
+            return height;
+        }
+    }""")
+    t = _java8_instanceof(t)
+    t = _java8_switch(t)
+    # Gson 2.8.0 (Minecraft and Paper 1.16.5) has no JsonParser.parseReader.
+    t = t.replace("JsonParser.parseReader(", "new JsonParser().parse(")
+
+    # 1.16.5's API
+    if name == "Constants.java":
+        t = t.replace("import org.slf4j.Logger;", "import org.apache.logging.log4j.LogManager;\nimport org.apache.logging.log4j.Logger;")
+        t = t.replace("import org.slf4j.LoggerFactory;\n", "")
+        t = t.replace("LoggerFactory.getLogger(", "LogManager.getLogger(")
+    t = t.replace("addRenderableWidget(", "addButton(")
+    t = sub(t, r"\n(\s*)this\.clearWidgets\(\);", r"\n\1this.buttons.clear();\n\1this.children.clear();")
+    t = sub(t, r"RenderSystem\.setShaderTexture\(0, ([^;]+)\);", r"this.minecraft.getTextureManager().bind(\1);")
+    t = t.replace("Screenshot.takeScreenshot(minecraft.getMainRenderTarget())",
+                  "Screenshot.takeScreenshot(minecraft.getWindow().getWidth(), minecraft.getWindow().getHeight(), minecraft.getMainRenderTarget())")
+    if name == "OpenArcadeForge.java":
+        t = """package net.pr1nted.openarcade.forge;
+
+import net.minecraftforge.fml.ExtensionPoint;
+import net.minecraftforge.fml.ModLoadingContext;
+import net.minecraftforge.fml.common.Mod;
+import net.pr1nted.openarcade.Constants;
+import net.pr1nted.openarcade.client.ArcadeClient;
+
+/** Forge. The Config button in Forge's mod list opens the arcade. */
+@Mod(Constants.MOD_ID)
+public final class OpenArcadeForge {
+    public OpenArcadeForge() {
+        // Forge 36 registers a mod's config screen as an extension point.
+        ModLoadingContext.get().registerExtensionPoint(ExtensionPoint.CONFIGGUIFACTORY,
+                () -> (minecraft, parent) -> ArcadeClient.screen(parent));
+        Constants.LOG.info("{} loaded on Forge", Constants.MOD_NAME);
+    }
+}
+"""
+    if name in ("ArcadeScreen.java", "GameScreen.java"):
+        t = t.replace("drawn with 1.17.1's GUI", "drawn with 1.16.5's GUI")
+    return t
+
+
 ERAS = {("1.21.11", "1.20.6"): to_1_20_6, ("1.20.6", "1.19.4"): to_1_19_4, ("1.19.4", "1.18.2"): to_1_18_2,
-        ("1.18.2", "1.17.1"): to_1_17_1}
+        ("1.18.2", "1.17.1"): to_1_17_1, ("1.17.1", "1.16.5"): to_1_16_5}
+
+
+# ---- 1.16.5 -> 1.15.2 --------------------------------------------------------------
+# No PoseStack in GUI drawing (1.16), buttons, text boxes and confirm screens take String
+# labels, no MutableComponent or TextColor, Font.substrByWidth. MC-Runtime-Test has no
+# build for 1.15, so the self-test also makes its own world and quits (see SELF_DRIVEN).
+
+SELF_DRIVEN = """
+    /**
+     * Where MC-Runtime-Test has no build (1.13 to 1.15), nothing joins a world for the
+     * test: with OPENARCADE_SELFTEST_CREATE_WORLD=1 it creates a flat creative world from
+     * the title screen, and quits the game once it has passed.
+     */
+    static final boolean CREATE_WORLD = "1".equals(System.getenv("OPENARCADE_SELFTEST_CREATE_WORLD"));
+    private static boolean worldRequested;
+
+    private static void createWorldIfAsked(Minecraft minecraft) {
+        if (!CREATE_WORLD || worldRequested || minecraft.level != null) return;
+        if (!(minecraft.screen instanceof net.minecraft.client.gui.screens.TitleScreen)) return;
+        worldRequested = true;
+        String id = "openarcade-selftest";
+        if (minecraft.getLevelSource().levelExists(id)) minecraft.getLevelSource().deleteLevel(id);
+        Constants.LOG.info("[self-test] creating a world");
+        minecraft.selectLevel(id, "Open Arcade self-test", new net.minecraft.world.level.LevelSettings(
+                0L, net.minecraft.world.level.GameType.CREATIVE, false, false, net.minecraft.world.level.LevelType.FLAT));
+    }
+"""
+
+
+def to_1_15_2(path, text):
+    name = os.path.basename(path)
+    t = text
+    t = t.replace("import com.mojang.blaze3d.vertex.PoseStack;\n", "")
+    t = sub(t, r"render\(PoseStack graphics, ", "render(")
+    t = t.replace("super.render(graphics, ", "super.render(")
+    t = t.replace("this.renderBackground(graphics);", "this.renderBackground();")
+    for fn in ("drawCenteredString", "drawString", "fill", "blit", "drawThumbnail"):
+        t = t.replace(f"{fn}(graphics, ", f"{fn}(")
+    t = t.replace("private void drawThumbnail(PoseStack graphics, ", "private void drawThumbnail(")
+    t = t.replace("plainSubstrByWidth(", "substrByWidth(")
+    # String labels
+    t = sub(t, r"new Button\(([^;]*?), new TextComponent\(([^;]*?)\), ", r"new Button(\1, \2, ")
+    t = sub(t, r"new Button\(([^;]*?), Lang\.text\(", r"new Button(\1, Lang.string(")
+    t = t.replace("CommonComponents.GUI_DONE", 'net.minecraft.client.resources.language.I18n.get("gui.done")')
+    t = t.replace("import net.minecraft.network.chat.CommonComponents;\n", "")
+    # Mod Menu before 2.0 (1.16 and older) kept its API under io.github.prospector.
+    t = t.replace("import com.terraformersmc.modmenu.api.", "import io.github.prospector.modmenu.api.")
+    t = sub(t, r"new EditBox\(([^;]*?), Lang\.text\(", r"new EditBox(\1, Lang.string(")
+    t = sub(t, r"Lang\.text\((\"[^\"]*\")\)\.withStyle\(s -> s\.withColor\(TextColor\.fromRgb\([^)]*\)\)\)\.getString\(\)", r"Lang.string(\1)")
+    t = t.replace("import net.minecraft.network.chat.TextColor;\n", "")
+    t = t.replace("drawCenteredString(this.font, this.title, ", "drawCenteredString(this.font, this.title.getString(), ")
+    if name == "Lang.java":
+        t = t.replace("import net.minecraft.network.chat.MutableComponent;\n", "")
+        t = t.replace("public static MutableComponent text(", "public static Component text(")
+    if name == "ArcadeClient.java":
+        # ConfirmScreen's buttons are Strings here
+        t = t.replace('Lang.text("openarcade.consent.download"),', 'Lang.string("openarcade.consent.download"),')
+        t = t.replace('Lang.text("openarcade.consent.browser")', 'Lang.string("openarcade.consent.browser")')
+    if name == "SelfTest.java":
+        t = t.replace("    static void tick(Minecraft minecraft) {\n        if (!ENABLED || step == Step.DONE) return;",
+                      SELF_DRIVEN + "\n    static void tick(Minecraft minecraft) {\n        if (!ENABLED || step == Step.DONE) return;\n        createWorldIfAsked(minecraft);")
+        t = t.replace('Constants.LOG.info("OPEN ARCADE SELF-TEST PASSED");\n                        step = Step.DONE;',
+                      'Constants.LOG.info("OPEN ARCADE SELF-TEST PASSED");\n                        step = Step.DONE;\n'
+                      '                        if (CREATE_WORLD) minecraft.stop();')
+    if name in ("ArcadeScreen.java", "GameScreen.java"):
+        t = t.replace("drawn with 1.16.5's GUI", "drawn with 1.15.2's GUI")
+    return t
+
+
+ERAS[("1.16.5", "1.15.2")] = to_1_15_2
 
 
 def set_property(text, name, value):
@@ -333,11 +532,38 @@ def main():
     plugin_yml = os.path.join(dst, "folia", "src", "main", "resources", "plugin.yml")
     if os.path.isfile(plugin_yml):
         text = open(plugin_yml, encoding="utf-8").read()
-        open(plugin_yml, "w", encoding="utf-8").write(re.sub(r"^api-version: .*$", f"api-version: '{target}'", text, flags=re.M))
+        # Bukkit took a patch version in api-version only from 1.20.5; before, "1.19" and not "1.19.4".
+        api = target if versions.key(target) >= [1, 20, 5] else ".".join(target.split(".")[:2])
+        open(plugin_yml, "w", encoding="utf-8").write(re.sub(r"^api-version: .*$", f"api-version: '{api}'", text, flags=re.M))
+    # Paper's API was com.destroystokyo.paper before 1.17.
+    group = loaders.get("paper_api_group")
+    folia_build = os.path.join(dst, "folia", "build.gradle")
+    if group and os.path.isfile(folia_build):
+        text = open(folia_build, encoding="utf-8").read()
+        text = re.sub(r'"[\w.]+:paper-api:\$\{paper_api_version\}"', '"${paper_api_group}:paper-api:${paper_api_version}"', text)
+        open(folia_build, "w", encoding="utf-8").write(text)
+        text = open(props, encoding="utf-8").read()
+        if re.search(r"^paper_api_group=", text, flags=re.M):
+            text = set_property(text, "paper_api_group", group)
+        else:
+            text = text.rstrip("\n") + f"\npaper_api_group={group}\n"
+        open(props, "w", encoding="utf-8").write(text)
     port_json = os.path.join(dst, "port.json")
     port = json.load(open(port_json, encoding="utf-8"))
     port["minecraft"] = target
     port["java"] = loaders["java_version"]
+    # MC-Runtime-Test 4.5.1 has builds for 1.12.2 and 1.16.5 on, none for 1.13 to 1.15:
+    # there the client runs in CI's self-driven job and the mod makes its own world.
+    if [1, 13] <= versions.key(target) < [1, 16]:
+        for client in port.get("clients", []):
+            client["mcrt"] = "none"
+    if not loaders.get("paper_api_version") and os.path.isdir(os.path.join(dst, "folia")):
+        # PaperMC publishes no plugin API this old (the plugin uses Paper's Adventure API),
+        # so this version has the client mod only.
+        port["folia"] = False
+        shutil.rmtree(os.path.join(dst, "folia"))
+        text = open(settings, encoding="utf-8").read()
+        open(settings, "w", encoding="utf-8").write(text.replace("include('folia')\n", ""))
     json.dump(port, open(port_json, "w", encoding="utf-8"), indent=2)
     open(port_json, "a", encoding="utf-8").write("\n")
 

@@ -114,7 +114,15 @@ def paper_api(mc):
     # Before 26.1, Paper published one rolling API per game version.
     legacy = f"{mc}-R0.1-SNAPSHOT"
     all_versions = maven_versions("https://repo.papermc.io/repository/maven-public/io/papermc/paper/paper-api/maven-metadata.xml")
-    return legacy if legacy in all_versions else None
+    if legacy in all_versions:
+        return legacy
+    # Before 1.17, under Paper's old group (see paper_api_group).
+    old = maven_versions("https://repo.papermc.io/repository/maven-public/com/destroystokyo/paper/paper-api/maven-metadata.xml")
+    return legacy if legacy in old else None
+
+
+def paper_api_group(mc):
+    return "com.destroystokyo.paper" if key(mc) < [1, 17] else "io.papermc.paper"
 
 
 def loaders(mc):
@@ -129,6 +137,7 @@ def loaders(mc):
         "forge_version": forge_version,
         "forge_loader_version_range": f"[{forge_version.split('.')[0]},)" if forge_version else None,
         "paper_api_version": paper_api(mc),
+        "paper_api_group": paper_api_group(mc),
     }
 
 

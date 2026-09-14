@@ -39,10 +39,6 @@ public abstract class OptionsScreenMixin extends Screen implements OptionsButton
                 .build());
     }
 
-    @Inject(method = "repositionElements", at = @At("TAIL"))
-    private void openarcade$placeButton(CallbackInfo ci) {
-        if (openarcade$button != null) openarcade$button.setX(this.width - 108);
-    }
 
     @Override
     public Button openarcade$optionsButton() {

@@ -41,8 +41,14 @@ curl -fsSL -o quilt-installer.jar \
 java -jar quilt-installer.jar install client "$MC" --install-dir="$MCDIR" --no-profile
 ls "$MCDIR/versions"
 
-curl -fsSL -o "run/mods/mc-runtime-test-${MC}-${MCRT_VERSION}-fabric-release.jar" \
-  "https://github.com/headlesshq/mc-runtime-test/releases/download/${MCRT_VERSION}/mc-runtime-test-${MC}-${MCRT_VERSION}-fabric-release.jar"
+# MC-Runtime-Test has no build for 1.13 to 1.15; there the mod's self-test makes its own
+# world and quits the game (OPENARCADE_SELFTEST_CREATE_WORLD).
+if ! curl -fsSL -o "run/mods/mc-runtime-test-${MC}-${MCRT_VERSION}-fabric-release.jar" \
+  "https://github.com/headlesshq/mc-runtime-test/releases/download/${MCRT_VERSION}/mc-runtime-test-${MC}-${MCRT_VERSION}-fabric-release.jar"; then
+  rm -f "run/mods/mc-runtime-test-${MC}-${MCRT_VERSION}-fabric-release.jar"
+  export OPENARCADE_SELFTEST_CREATE_WORLD=1
+  echo "No MC-Runtime-Test for ${MC}: the self-test creates its own world"
+fi
 find "$JARS" -name 'openarcade-fabric-*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' -exec cp {} run/mods/ \;
 ls -l run/mods
 
@@ -52,8 +58,8 @@ pauseOnLostFocus:false
 EOF
 
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y x11-xserver-utils >/dev/null
-xvfb-run java -Dhmc.check.xvfb=true -jar headlessmc-launcher.jar \
-  --command launch '.*quilt.*' -regex --jvm "-Djava.awt.headless=true"
+timeout 1200 xvfb-run java -Dhmc.check.xvfb=true -jar headlessmc-launcher.jar \
+  --command launch '.*quilt.*' -regex --jvm "-Djava.awt.headless=true" || true
 
 # A launch that joins a world and quits is not a pass by itself; see ci.yml.
 if [ ! -f run/openarcade-selftest-passed ]; then

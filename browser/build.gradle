@@ -11,7 +11,8 @@ plugins {
 java.toolchain.languageVersion = JavaLanguageVersion.of(java_version)
 
 tasks.withType(JavaCompile).configureEach {
-    options.release = 8
+    // JDK 8's javac has no --release; its own output is already Java 8.
+    if (Integer.parseInt(java_version) >= 9) options.release = 8
     options.encoding = 'UTF-8'
     options.compilerArgs += ['-Xlint:-options']
 }
