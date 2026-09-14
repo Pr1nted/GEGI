@@ -1,11 +1,14 @@
 package net.pr1nted.openarcade.client;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.ConfirmScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.util.Util;
 import net.pr1nted.openarcade.Constants;
 import net.pr1nted.openarcade.catalog.Catalog;
+import net.pr1nted.openarcade.catalog.GameEntry;
 import net.pr1nted.openarcade.catalog.Links;
+import net.pr1nted.openarcade.client.browser.BrowserRuntime;
 import org.jspecify.annotations.Nullable;
 
 import java.net.URI;
@@ -63,6 +66,33 @@ public final class ArcadeClient {
         }
         SelfTest.tick(minecraft);
         DevScreenshot.tick(minecraft);
+    }
+
+    /**
+     * Plays a game inside Minecraft. The first time, before Chromium has been
+     * downloaded, the player is asked; declining opens the game in their own browser.
+     */
+    public static void play(@Nullable Screen parent, GameEntry game) {
+        if (!Links.isAllowed(game.url())) {
+            Constants.LOG.warn("Refused to open {}: not an itch.io or Newgrounds link", game.url());
+            return;
+        }
+        Minecraft minecraft = Minecraft.getInstance();
+        if (BrowserRuntime.chromiumInstalled()) {
+            minecraft.gui.setScreen(new GameScreen(parent, game));
+            return;
+        }
+        minecraft.gui.setScreen(new ConfirmScreen(yes -> {
+            if (yes) {
+                minecraft.gui.setScreen(new GameScreen(parent, game));
+            } else {
+                openLink(game.url());
+                minecraft.gui.setScreen(parent);
+            }
+        }, Lang.text("openarcade.consent.title"),
+                Lang.text("openarcade.consent.message", BrowserRuntime.dataDir()),
+                Lang.text("openarcade.consent.download"),
+                Lang.text("openarcade.consent.browser")));
     }
 
     /** Opens a game in the player's browser. Anything outside itch.io and Newgrounds is refused. */

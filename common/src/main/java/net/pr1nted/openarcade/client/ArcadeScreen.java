@@ -151,7 +151,8 @@ public final class ArcadeScreen extends Screen {
     private void openPasted() {
         Optional<URI> uri = Links.parsePasted(pasted);
         if (uri.isPresent()) {
-            ArcadeClient.openLink(uri.get());
+            URI link = uri.get();
+            ArcadeClient.play(this, new GameEntry(link.getHost(), link, link.getHost(), Optional.empty(), "", link.getHost(), Optional.empty()));
             notice = null;
         } else {
             notice = Lang.text("openarcade.link.invalid");
@@ -269,7 +270,7 @@ public final class ArcadeScreen extends Screen {
         GameEntry game = gameAt(event.x(), event.y());
         if (game == null) return false;
         AbstractWidget.playButtonClickSound(this.minecraft.getSoundManager());
-        ArcadeClient.openLink(game.url());
+        ArcadeClient.play(this, game);
         return true;
     }
 

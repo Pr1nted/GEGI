@@ -1,11 +1,11 @@
 # Open Arcade
 
-**Browse and open itch.io and Newgrounds web games from inside Minecraft.**
+**Browse itch.io and Newgrounds web games, and play them, inside Minecraft.**
 
 An Open Arcade button in Options, or `/arcade` in chat, opens a menu of web games:
 recommended picks (Open Doctrines first), live shelves from itch.io, a search box,
-and a box for pasting any itch.io or Newgrounds link. Click a game and it opens in
-your web browser.
+and a box for pasting any itch.io or Newgrounds link. Click a game and it plays right there, in
+Minecraft's window, keyboard and mouse included.
 
 Minecraft 26.2 · Fabric · Quilt · NeoForge · Forge · Folia (server plugin) · MIT
 
@@ -14,7 +14,11 @@ Minecraft 26.2 · Fabric · Quilt · NeoForge · Forge · Folia (server plugin) 
 - **The menu.** Recommended, Popular, Newest, Free and Strategy tabs read from
   itch.io's own browse feeds, with thumbnails. A Browse sites tab links to the itch.io
   and Newgrounds game pages. Search filters the current tab.
-- **Three ways in.** The Open Arcade button at the top right of Options; typing
+- **Games run in the game.** Open Arcade carries its own Chromium: the page draws
+  into a Minecraft screen and every key, click and scroll goes to it. Escape belongs to
+  the game you are playing; press it twice to leave. *Open in browser* is always one
+  click away.
+- **Three ways in. The Open Arcade button at the top right of Options; typing
   `/arcade` (or `/openarcade`) in chat, handled on your side and never sent to the
   server; and the Config button in your loader's mod list (Mod Menu on Fabric and
   Quilt, the built-in list on NeoForge and Forge).
@@ -24,13 +28,40 @@ Minecraft 26.2 · Fabric · Quilt · NeoForge · Forge · Folia (server plugin) 
 - **Folia and Paper.** A server has no screen, so the plugin's `/arcade` sends the same
   recommendations as clickable chat links.
 
+## Playing inside Minecraft
+
+The first time you play, Open Arcade asks before downloading Chromium (about 100 MB,
+300 MB unpacked: the [jcefmaven](https://github.com/jcefmaven/jcefmaven) natives, from
+Maven Central or jcefmaven's GitHub releases). Say no and games open in your own browser instead. Chromium is kept
+per player, not per instance, so every Minecraft version and modpack shares one copy:
+
+| OS | Where |
+|---|---|
+| Windows | `%LOCALAPPDATA%\OpenArcade` |
+| macOS | `~/Library/Application Support/OpenArcade` |
+| Linux | `$XDG_DATA_HOME/openarcade` or `~/.local/share/openarcade` |
+
+Delete that folder to remove it. It also holds the browser profile, so an itch.io
+login stays logged in.
+
+Chromium runs in a separate process on Minecraft's own Java (`openarcade-browser.jar`,
+inside the mod jar), with no window. It paints frames into shared memory, which the mod
+uploads as a texture; input goes back over a pipe. The process exits with the game, and
+a crash in a web page cannot take Minecraft down with it.
+
+Where Chromium cannot start (Windows on ARM has no windowless Chromium build), the game
+screen says why, and *Open in browser* opens the game in your own browser.
+
 ## What it connects to
 
 - `itch.io/games/.../platform-web.xml`, itch.io's public RSS feeds for its browse pages.
 - `img.itch.zone`, for thumbnails.
 
-Nothing else. No accounts, no telemetry. Games open in your own browser, and only
-itch.io and Newgrounds links open at all; anything else is refused.
+- Maven Central or jcefmaven's GitHub releases, once, when you agree to download Chromium.
+- The games you play, in Chromium, like any browser.
+
+Nothing else. No accounts, no telemetry. Only itch.io and Newgrounds links open from
+the menu; anything else is refused.
 
 **Newgrounds** blocks automated requests to its listings, so the mod does not fetch
 Newgrounds lists. It links to Newgrounds' game pages, and any Newgrounds game link you
@@ -76,6 +107,11 @@ In the client jobs the mod runs its own self-test in the world
 (`OPENARCADE_SELFTEST=1`): it types `/arcade`, waits for the menu to draw, opens
 Options, clicks the Open Arcade button and checks the menu opened again. Anything that
 does not happen fails the job.
+
+- **Chromium.** `./gradlew :browser:smokeTest` starts the helper exactly as the mod
+  does, loads a page, and checks that a click, a key press, a typed character and a
+  resize each reach it and come back as a frame. CI runs it on Linux (Java 8 and 25),
+  Windows and macOS.
 
 ## License
 

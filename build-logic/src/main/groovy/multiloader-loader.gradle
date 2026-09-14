@@ -30,6 +30,8 @@ tasks.named('compileJava', JavaCompile) {
 processResources {
     dependsOn(configurations.commonResources)
     from(configurations.commonResources)
+    // The Chromium helper rides inside every loader's jar and is unpacked on first play.
+    from(project(':browser').tasks.named('helperJar'))
 }
 
 tasks.named('javadoc', Javadoc).configure {

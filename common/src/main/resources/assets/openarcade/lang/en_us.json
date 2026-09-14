@@ -11,6 +11,17 @@
   "openarcade.loading": "Loading games from itch.io...",
   "openarcade.failed": "Could not reach itch.io: %s",
   "openarcade.empty": "Nothing matches your search",
-  "openarcade.opens_in_browser": "Games open in your web browser",
-  "openarcade.featured": "Recommended"
+  "openarcade.opens_in_browser": "Games play right here; Esc twice leaves one",
+  "openarcade.featured": "Recommended",
+  "openarcade.game.back": "Back",
+  "openarcade.game.browser": "Open in browser",
+  "openarcade.game.leave_hint": "Esc twice to leave",
+  "openarcade.game.starting": "Starting Chromium...",
+  "openarcade.game.downloading": "Downloading Chromium: %s%%",
+  "openarcade.game.unpacking": "Unpacking Chromium...",
+  "openarcade.game.failed": "Chromium could not start: %s",
+  "openarcade.consent.title": "Play games inside Minecraft?",
+  "openarcade.consent.message": "Games run in Chromium, which Open Arcade downloads once (about 100 MB, 300 MB unpacked) and keeps in %s for every Minecraft version you play. Nothing else is installed.",
+  "openarcade.consent.download": "Download and play",
+  "openarcade.consent.browser": "Open in my browser"
 }

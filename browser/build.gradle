@@ -1,0 +1,79 @@
+// The Chromium helper: a separate JVM that runs Chromium without a window and hands
+// frames to the game through a memory-mapped file (see BrowserProtocol).
+//
+// Java 8 bytecode, because the same helper serves every Minecraft version, and the
+// oldest still ship Java 8. It runs on the game's own Java, in its own process,
+// on a plain classpath: that is what makes ArcadeOsrBrowser's split package legal.
+plugins {
+    id 'java'
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(java_version)
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 8
+    options.encoding = 'UTF-8'
+    options.compilerArgs += ['-Xlint:-options']
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation('me.friwi:jcefmaven:146.0.10') {
+        // JOGL is only for java-cef's own windowed/GLCanvas browsers, which are never used.
+        exclude group: 'me.friwi', module: 'jogl-all'
+        exclude group: 'me.friwi', module: 'gluegen-rt'
+    }
+}
+
+// The protocol constants live with the mod's common code; compile the same file here.
+sourceSets.main.java {
+    srcDir project(':common').file('src/main/java')
+    include 'org/cef/**', 'net/pr1nted/openarcade/browser/**'
+}
+
+tasks.register('helperJar', Jar) {
+    archiveFileName = 'openarcade-browser.jar'
+    destinationDirectory = layout.buildDirectory.dir('helper')
+    manifest {
+        attributes 'Main-Class': 'net.pr1nted.openarcade.browser.BrowserHost'
+    }
+    from sourceSets.main.output
+    dependsOn configurations.runtimeClasspath
+    from({ configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) } }) {
+        exclude 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA', 'META-INF/versions/**', 'module-info.class'
+    }
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+tasks.named('assemble') {
+    dependsOn 'helperJar'
+}
+
+// The helper without Minecraft: load a page, click, type, press a key, resize, quit,
+// and check each one arrived (see HelperSmoke). CI runs it on every OS.
+//   ./gradlew :browser:smokeTest [-PsmokeJavaHome=/path/to/jdk] [-PsmokeInstall=/dir]
+// Its own source set, not 'test': it is a program that drives a real Chromium, not a unit test.
+sourceSets {
+    smoke {
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += sourceSets.main.output
+    }
+}
+
+tasks.register('smokeTest', JavaExec) {
+    group = 'verification'
+    description = 'Drives the Chromium helper through every protocol command.'
+    dependsOn 'helperJar', 'smokeClasses'
+    classpath = sourceSets.smoke.runtimeClasspath
+    mainClass = 'net.pr1nted.openarcade.browser.HelperSmoke'
+    if (project.hasProperty('smokeJavaHome')) {
+        executable = new File(project.property('smokeJavaHome') as String, 'bin/java').absolutePath
+    } else {
+        javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(java_version) }
+    }
+    def install = project.hasProperty('smokeInstall') ? project.property('smokeInstall') : layout.buildDirectory.dir('chromium').get().asFile.absolutePath
+    args layout.buildDirectory.file('helper/openarcade-browser.jar').get().asFile.absolutePath, install
+}
