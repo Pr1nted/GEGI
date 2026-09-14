@@ -23,5 +23,6 @@
   "openarcade.consent.title": "Play games inside Minecraft?",
   "openarcade.consent.message": "Games run in Chromium, which Open Arcade downloads once (about 100 MB, 300 MB unpacked) and keeps in %s for every Minecraft version you play. Nothing else is installed.",
   "openarcade.consent.download": "Download and play",
-  "openarcade.consent.browser": "Open in my browser"
+  "openarcade.consent.browser": "Open in my browser",
+  "openarcade.site.browse": "Browse"
 }

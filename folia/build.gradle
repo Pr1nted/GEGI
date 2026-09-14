@@ -20,7 +20,7 @@ dependencies {
 processResources {
     inputs.property('version', version)
     // The same catalog the client mod ships, so both recommend the same games.
-    from(project(':common').file('src/main/resources/assets/openarcade/catalog.json')) {
+    from(project(':core').file('src/main/resources/assets/openarcade/catalog.json')) {
         into 'openarcade'
     }
     filesMatching('plugin.yml') {

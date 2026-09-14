@@ -12,6 +12,7 @@ configurations {
 }
 
 dependencies {
+    compileOnly(project(':core'))
     compileOnly(project(':common')) {
         def loaderAttribute = Attribute.of('io.github.mcgradleconventions.loader', String)
         attributes {
@@ -25,11 +26,14 @@ dependencies {
 tasks.named('compileJava', JavaCompile) {
     dependsOn(configurations.commonJava)
     source(configurations.commonJava)
+    // The core is compiled into each loader's jar, like common.
+    source(project(':core').file('src/main/java'))
 }
 
 processResources {
     dependsOn(configurations.commonResources)
     from(configurations.commonResources)
+    from(project(':core').file('src/main/resources'))
     // The Chromium helper rides inside every loader's jar and is unpacked on first play.
     from(project(':browser').tasks.named('helperJar'))
 }
@@ -37,6 +41,7 @@ processResources {
 tasks.named('javadoc', Javadoc).configure {
     dependsOn(configurations.commonJava)
     source(configurations.commonJava)
+    source(project(':core').file('src/main/java'))
 }
 
 tasks.named('sourcesJar', Jar) {
@@ -44,4 +49,6 @@ tasks.named('sourcesJar', Jar) {
     from(configurations.commonJava)
     dependsOn(configurations.commonResources)
     from(configurations.commonResources)
+    from(project(':core').file('src/main/java'))
+    from(project(':core').file('src/main/resources'))
 }

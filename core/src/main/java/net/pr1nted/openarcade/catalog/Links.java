@@ -35,12 +35,12 @@ public final class Links {
      */
     public static Optional<URI> parsePasted(String text) {
         if (text == null) return Optional.empty();
-        String t = text.strip();
+        String t = text.trim();
         if (t.isEmpty() || t.contains(" ")) return Optional.empty();
         if (!t.contains("://")) t = "https://" + t;
         try {
             URI uri = URI.create(t);
-            return isAllowed(uri) ? Optional.of(uri) : Optional.empty();
+            return isAllowed(uri) ? Optional.of(uri) : Optional.<URI>empty();
         } catch (IllegalArgumentException e) {
             return Optional.empty();
         }

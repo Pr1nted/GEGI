@@ -5,10 +5,11 @@ import net.minecraft.client.gui.screens.ConfirmScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.util.Util;
 import net.pr1nted.openarcade.Constants;
+import net.pr1nted.openarcade.Log;
 import net.pr1nted.openarcade.catalog.Catalog;
 import net.pr1nted.openarcade.catalog.GameEntry;
 import net.pr1nted.openarcade.catalog.Links;
-import net.pr1nted.openarcade.client.browser.BrowserRuntime;
+import net.pr1nted.openarcade.runtime.BrowserRuntime;
 import org.jspecify.annotations.Nullable;
 
 import java.net.URI;
@@ -22,6 +23,26 @@ import java.util.Set;
  */
 public final class ArcadeClient {
     private ArcadeClient() {}
+
+    static {
+        // The core logs through this game's logger.
+        Log.use(new Log.Sink() {
+            @Override
+            public void info(String message) {
+                Constants.LOG.info(message);
+            }
+
+            @Override
+            public void warn(String message, Throwable error) {
+                Constants.LOG.warn(message, error);
+            }
+
+            @Override
+            public void error(String message, Throwable error) {
+                Constants.LOG.error(message, error);
+            }
+        });
+    }
 
     /** Typed in chat as /arcade or /openarcade. Handled on the client; the server never sees it. */
     public static final Set<String> COMMANDS = Set.of("arcade", "openarcade");

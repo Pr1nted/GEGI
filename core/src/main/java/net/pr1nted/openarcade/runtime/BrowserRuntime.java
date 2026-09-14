@@ -1,10 +1,10 @@
-package net.pr1nted.openarcade.client.browser;
+package net.pr1nted.openarcade.runtime;
 
-import net.pr1nted.openarcade.Constants;
+import net.pr1nted.openarcade.Log;
 import net.pr1nted.openarcade.browser.api.BrowserProtocol;
-import org.lwjgl.system.MemoryUtil;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -13,6 +13,7 @@ import java.io.OutputStreamWriter;
 import java.io.RandomAccessFile;
 import java.io.Writer;
 import java.net.URI;
+import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
@@ -22,6 +23,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 
@@ -35,15 +37,19 @@ import java.util.Locale;
  *
  * <p>Chromium itself (about 100 MB, 300 MB unpacked) is downloaded by the helper into
  * {@link #dataDir()}, once per player, shared by every Minecraft version and instance.
+ *
+ * <p>Plain Java 8 and nothing of Minecraft, so every version of the mod uses this one.
  */
 public final class BrowserRuntime {
 
     public enum State { STOPPED, STARTING, DOWNLOADING, READY, FAILED }
 
-    /** Receives a frame: {@code prepare} returns where to put width*height*4 RGBA bytes. */
+    /** Receives a frame. */
     public interface FrameTarget {
-        long prepare(int width, int height);
+        /** Room for width*height*4 RGBA bytes, from position 0. The frame is copied into it. */
+        ByteBuffer prepare(int width, int height);
 
+        /** The copy in the buffer is a whole frame: upload it. */
         void done();
     }
 
@@ -63,7 +69,7 @@ public final class BrowserRuntime {
 
     private Process process;
     private Writer commands;
-    private MappedByteBuffer frames;
+    private volatile MappedByteBuffer frames;
     private long lastSequence;
     private final List<String> pending = new ArrayList<>();
 
@@ -137,7 +143,10 @@ public final class BrowserRuntime {
             send(line);
             return;
         }
-        pending.removeIf(p -> p.startsWith(line.substring(0, line.indexOf(' '))));
+        String verb = line.substring(0, line.indexOf(' '));
+        for (Iterator<String> it = pending.iterator(); it.hasNext(); ) {
+            if (it.next().startsWith(verb + " ")) it.remove();
+        }
         pending.add(line);
         if (state == State.STOPPED || state == State.FAILED) start();
     }
@@ -153,11 +162,13 @@ public final class BrowserRuntime {
 
             File frameFile = File.createTempFile("openarcade-frames", ".bin");
             frameFile.deleteOnExit();
+            MappedByteBuffer map;
             try (RandomAccessFile raf = new RandomAccessFile(frameFile, "rw")) {
                 raf.setLength(BrowserProtocol.fileBytes());
-                frames = raf.getChannel().map(FileChannel.MapMode.READ_ONLY, 0, BrowserProtocol.fileBytes());
+                map = raf.getChannel().map(FileChannel.MapMode.READ_ONLY, 0, BrowserProtocol.fileBytes());
             }
-            frames.order(ByteOrder.LITTLE_ENDIAN);
+            map.order(ByteOrder.LITTLE_ENDIAN);
+            frames = map;
             lastSequence = 0;
 
             List<String> cmd = new ArrayList<>();
@@ -182,7 +193,7 @@ public final class BrowserRuntime {
             ProcessBuilder builder = new ProcessBuilder(cmd).redirectError(dir.resolve("helper.log").toFile());
             process = builder.start();
             commands = new OutputStreamWriter(process.getOutputStream(), StandardCharsets.UTF_8);
-            Process started = process;
+            final Process started = process;
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 gameStopping = true;
                 started.destroy();
@@ -190,7 +201,7 @@ public final class BrowserRuntime {
             Thread reader = new Thread(() -> readEvents(started), "Open Arcade helper events");
             reader.setDaemon(true);
             reader.start();
-            Constants.LOG.info("Started the Chromium helper ({})", jar);
+            Log.info("Started the Chromium helper ({})", jar);
         } catch (IOException | RuntimeException e) {
             fail("could not start the Chromium helper: " + e);
         }
@@ -211,7 +222,7 @@ public final class BrowserRuntime {
     }
 
     private static byte[] readAll(InputStream in) throws IOException {
-        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
         byte[] buf = new byte[65536];
         int n;
         while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
@@ -239,7 +250,7 @@ public final class BrowserRuntime {
                         break;
                     case BrowserProtocol.ERROR:
                         String message = line.length() > f[0].length() ? line.substring(f[0].length() + 1) : "unknown";
-                        Constants.LOG.warn("Chromium helper: {}", message);
+                        Log.warn("Chromium helper: {}", message);
                         if (state != State.READY) fail(message);
                         break;
                     default:
@@ -278,7 +289,7 @@ public final class BrowserRuntime {
     private void fail(String message) {
         error = message;
         state = State.FAILED;
-        Constants.LOG.error("Open Arcade: {}", message);
+        Log.error("Open Arcade: {}", message);
     }
 
     private static int parse(String s) {
@@ -292,6 +303,7 @@ public final class BrowserRuntime {
     /**
      * Copies the newest whole frame into the target, if there is one it has not seen.
      * A frame the helper rewrote during the copy is dropped; the next one replaces it.
+     * Call on the render thread.
      */
     public boolean pollFrame(FrameTarget target) {
         MappedByteBuffer map = frames;
@@ -301,8 +313,14 @@ public final class BrowserRuntime {
         int width = map.getInt(BrowserProtocol.OFFSET_WIDTH);
         int height = map.getInt(BrowserProtocol.OFFSET_HEIGHT);
         if (width <= 16 || height <= 16 || width > BrowserProtocol.MAX_WIDTH || height > BrowserProtocol.MAX_HEIGHT) return false;
-        long destination = target.prepare(width, height);
-        MemoryUtil.memCopy(MemoryUtil.memAddress(map) + BrowserProtocol.HEADER_BYTES, destination, (long) width * height * 4);
+        int bytes = width * height * 4;
+        ByteBuffer destination = target.prepare(width, height);
+        ByteBuffer source = map.duplicate();
+        source.clear();
+        source.position(BrowserProtocol.HEADER_BYTES);
+        source.limit(BrowserProtocol.HEADER_BYTES + bytes);
+        destination.clear();
+        destination.put(source);
         if (map.getLong(BrowserProtocol.OFFSET_SEQUENCE) != sequence) return false;
         lastSequence = sequence;
         target.done();

@@ -12,6 +12,7 @@ import java.io.Reader;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -21,16 +22,83 @@ import java.util.Optional;
  *
  * <p>Read from {@code /assets/openarcade/catalog.json} on the classpath. The Folia
  * plugin reads the same file, so the in-game menu and the server command always
- * recommend the same games.
+ * recommend the same games. Gson comes from the game: every Minecraft since 1.8 ships
+ * it, and only API old enough for all of them is used.
  */
-public record Catalog(List<GameEntry> recommended, List<Shelf> shelves, List<SiteLink> sites) {
+public final class Catalog {
 
     /** One itch.io feed; {@code tab} is its short name on the tab row, {@code title} the heading. */
-    public record Shelf(String id, String tab, String title, URI feed) {}
+    public static final class Shelf {
+        private final String id;
+        private final String tab;
+        private final String title;
+        private final URI feed;
 
-    public record SiteLink(String title, URI url) {}
+        public Shelf(String id, String tab, String title, URI feed) {
+            this.id = id;
+            this.tab = tab;
+            this.title = title;
+            this.feed = feed;
+        }
+
+        public String id() {
+            return id;
+        }
+
+        public String tab() {
+            return tab;
+        }
+
+        public String title() {
+            return title;
+        }
+
+        public URI feed() {
+            return feed;
+        }
+    }
+
+    public static final class SiteLink {
+        private final String title;
+        private final URI url;
+
+        public SiteLink(String title, URI url) {
+            this.title = title;
+            this.url = url;
+        }
+
+        public String title() {
+            return title;
+        }
+
+        public URI url() {
+            return url;
+        }
+    }
 
     public static final String RESOURCE = "/assets/openarcade/catalog.json";
+
+    private final List<GameEntry> recommended;
+    private final List<Shelf> shelves;
+    private final List<SiteLink> sites;
+
+    public Catalog(List<GameEntry> recommended, List<Shelf> shelves, List<SiteLink> sites) {
+        this.recommended = Collections.unmodifiableList(new ArrayList<>(recommended));
+        this.shelves = Collections.unmodifiableList(new ArrayList<>(shelves));
+        this.sites = Collections.unmodifiableList(new ArrayList<>(sites));
+    }
+
+    public List<GameEntry> recommended() {
+        return recommended;
+    }
+
+    public List<Shelf> shelves() {
+        return shelves;
+    }
+
+    public List<SiteLink> sites() {
+        return sites;
+    }
 
     public static Catalog bundled() {
         try (InputStream in = Catalog.class.getResourceAsStream(RESOURCE)) {
@@ -41,8 +109,9 @@ public record Catalog(List<GameEntry> recommended, List<Shelf> shelves, List<Sit
         }
     }
 
+    @SuppressWarnings("deprecation") // JsonParser.parseReader is Gson 2.8.6+; 1.12.2 ships 2.8.0
     static Catalog read(Reader reader) {
-        JsonObject root = JsonParser.parseReader(reader).getAsJsonObject();
+        JsonObject root = new JsonParser().parse(reader).getAsJsonObject();
         List<GameEntry> recommended = new ArrayList<>();
         for (JsonElement e : array(root, "recommended")) {
             JsonObject o = e.getAsJsonObject();
@@ -50,7 +119,7 @@ public record Catalog(List<GameEntry> recommended, List<Shelf> shelves, List<Sit
                     o.get("title").getAsString(),
                     URI.create(o.get("url").getAsString()),
                     string(o, "blurb"),
-                    Optional.empty(),
+                    Optional.<URI>empty(),
                     string(o, "price"),
                     string(o, "site"),
                     Optional.ofNullable(o.has("texture") ? o.get("texture").getAsString() : null)));
@@ -69,7 +138,7 @@ public record Catalog(List<GameEntry> recommended, List<Shelf> shelves, List<Sit
             if (!Links.isAllowed(url)) throw new IllegalArgumentException("site link not allowed: " + url);
             sites.add(new SiteLink(o.get("title").getAsString(), url));
         }
-        return new Catalog(List.copyOf(recommended), List.copyOf(shelves), List.copyOf(sites));
+        return new Catalog(recommended, shelves, sites);
     }
 
     private static JsonArray array(JsonObject root, String key) {

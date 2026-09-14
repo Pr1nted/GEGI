@@ -28,9 +28,9 @@ dependencies {
     }
 }
 
-// The protocol constants live with the mod's common code; compile the same file here.
+// The protocol constants live in the mod's core; compile the same file here.
 sourceSets.main.java {
-    srcDir project(':common').file('src/main/java')
+    srcDir project(':core').file('src/main/java')
     include 'org/cef/**', 'net/pr1nted/openarcade/browser/**'
 }
 

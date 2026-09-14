@@ -1,0 +1,46 @@
+// Open Arcade's core: everything that is not Minecraft. The catalog and itch.io feeds,
+// the link allowlist, the menu's model, the strings, and the game's side of the
+// Chromium helper.
+//
+// Java 8 and no Minecraft classes, because one copy serves every version from 1.12.2
+// (Java 8, log4j, Gson 2.8.0) to today. Each version's build compiles these sources
+// into its own jar; nothing here is a library a player installs.
+plugins {
+    id 'java-library'
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(java_version)
+
+tasks.named('compileJava', JavaCompile) {
+    options.release = 8
+    options.encoding = 'UTF-8'
+    options.compilerArgs += ['-Xlint:-options']
+}
+
+// The tests are not shipped, so they may use today's Java.
+tasks.named('compileTestJava', JavaCompile) {
+    options.release = Integer.parseInt(java_version)
+    options.encoding = 'UTF-8'
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // Every Minecraft ships Gson; compiling against the oldest one (1.12.2's) keeps newer API out.
+    compileOnly('com.google.code.gson:gson:2.8.0')
+
+    testImplementation(platform('org.junit:junit-bom:5.13.4'))
+    testImplementation('org.junit.jupiter:junit-jupiter')
+    testRuntimeOnly('org.junit.platform:junit-platform-launcher')
+    testRuntimeOnly('com.google.code.gson:gson:2.8.0')
+}
+
+tasks.named('test', Test) {
+    useJUnitPlatform()
+    testLogging {
+        events 'passed', 'failed', 'skipped'
+        exceptionFormat 'full'
+    }
+}

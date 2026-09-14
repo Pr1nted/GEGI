@@ -12,8 +12,11 @@ import net.minecraft.resources.Identifier;
 import net.pr1nted.openarcade.Constants;
 import net.pr1nted.openarcade.browser.api.BrowserProtocol;
 import net.pr1nted.openarcade.catalog.GameEntry;
-import net.pr1nted.openarcade.client.browser.BrowserRuntime;
+import net.pr1nted.openarcade.runtime.BrowserRuntime;
 import org.jspecify.annotations.Nullable;
+import org.lwjgl.system.MemoryUtil;
+
+import java.nio.ByteBuffer;
 
 /**
  * A web game, playing inside Minecraft. Chromium runs in the helper process; this
@@ -45,7 +48,7 @@ public final class GameScreen extends Screen {
 
     private final BrowserRuntime.FrameTarget target = new BrowserRuntime.FrameTarget() {
         @Override
-        public long prepare(int width, int height) {
+        public ByteBuffer prepare(int width, int height) {
             if (texture == null || width != textureWidth || height != textureHeight) {
                 if (texture != null) minecraft.getTextureManager().release(TEXTURE_ID);
                 texture = new DynamicTexture(() -> "Open Arcade game view", width, height, false);
@@ -53,7 +56,7 @@ public final class GameScreen extends Screen {
                 textureWidth = width;
                 textureHeight = height;
             }
-            return texture.getPixels().getPointer();
+            return MemoryUtil.memByteBuffer(texture.getPixels().getPointer(), width * height * 4);
         }
 
         @Override

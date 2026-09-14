@@ -54,7 +54,7 @@ public final class ItchFeed {
                 // a card without a picture is still a card
             }
             games.add(new GameEntry(title, link, blurb(text(item, "description")), image,
-                    price(text(item, "price"), text(item, "currency")), "itch.io", Optional.empty()));
+                    price(text(item, "price"), text(item, "currency")), "itch.io", Optional.<String>empty()));
         }
         return games;
     }
@@ -63,7 +63,7 @@ public final class ItchFeed {
         NodeList nodes = parent.getElementsByTagName(tag);
         for (int i = 0; i < nodes.getLength(); i++) {
             Node n = nodes.item(i);
-            if (n.getParentNode() == parent) return n.getTextContent().strip();
+            if (n.getParentNode() == parent) return n.getTextContent().trim();
         }
         return "";
     }
@@ -71,7 +71,7 @@ public final class ItchFeed {
     /** The description is "a line of text" followed by an {@code <img>} tag; keep the line. */
     static String blurb(String description) {
         String firstLine = description.split("\\R", 2)[0];
-        return firstLine.replaceAll("<[^>]*>", "").strip();
+        return firstLine.replaceAll("<[^>]*>", "").trim();
     }
 
     static String price(String amount, String currency) {
