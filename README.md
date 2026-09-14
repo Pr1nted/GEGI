@@ -154,6 +154,28 @@ ModDevGradle, and everywhere the version is written down) on a branch
 `port/<minecraft>`, and the whole CI runs on it, real clients and self-test included.
 A green run opens a pull request; a red one opens an issue that links the failing jobs.
 
+## Releasing
+
+`.github/workflows/release.yml` publishes to Modrinth and CurseForge from a tag:
+
+```bash
+git tag -a v1.0.0 -m "What changed"
+```
+
+```bash
+git push origin v1.0.0
+```
+
+The tag must match `version` in every `versions/*/gradle.properties`, and its message
+becomes the changelog. The whole CI runs on the tagged commit first; only if it passes
+are its jars uploaded, one file per Minecraft version and loader
+(`ci/release/publish.py`): the mod to the mod projects, the Folia plugin to the plugin
+projects. The Fabric jar is also tagged Quilt. Tokens are repository secrets
+(`MODRINTH_TOKEN`, `CURSEFORGE_TOKEN`, `BUKKIT_TOKEN`) and project IDs are repository
+variables (`MODRINTH_MOD_ID`, `MODRINTH_PLUGIN_ID`, `CURSEFORGE_MOD_ID`,
+`BUKKIT_PLUGIN_ID`); a site without its ID is skipped. `publish.py plan --jars <dir>`
+shows what would be uploaded, with no token.
+
 ## License
 
 MIT. See [LICENSE](LICENSE).

@@ -7,7 +7,7 @@
 #   client    start the actual Minecraft client, headless, on each version's loaders
 #             with the mod installed (headlesshq/mc-runtime-test). With
 #             GEGI_SELFTEST=1 the mod opens its own menu, checks the Options
-#             button and the /arcade command, and crashes the game if any of it
+#             button and the /gegi command, and crashes the game if any of it
 #             fails, so a pass means the menu works, not just that the jar loaded
 #   selfdrive the same for versions MC-Runtime-Test has no build for (1.13 to 1.15):
 #             HeadlessMC starts the client and the mod's self-test makes its own world
@@ -19,7 +19,9 @@
 name: CI
 
 on:
+  # Branches only: a release tag runs this through release.yml, which publishes what it built.
   push:
+    branches: ["**"]
   pull_request:
   workflow_dispatch:
     inputs:

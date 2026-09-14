@@ -1,0 +1,114 @@
+# Publishes GEGI to Modrinth and CurseForge when a version tag is pushed:
+#
+#   git tag -a v1.0.0 -m "What changed"     # the tag's message becomes the changelog
+#   git push origin v1.0.0
+#
+# The tag must match `version` in every versions/*/gradle.properties. The whole CI runs
+# on the tagged commit first, every loader started as a real client with the self-test;
+# only when it passes are the jars that run built uploaded, one file per Minecraft
+# version and loader (ci/release/publish.py).
+#
+# Repository secrets (Settings > Secrets and variables > Actions > Secrets):
+#   MODRINTH_TOKEN      Modrinth personal access token
+#   CURSEFORGE_TOKEN    CurseForge upload API token
+#   BUKKIT_TOKEN        dev.bukkit.org upload API token (only for the plugin there)
+# Repository variables (same page, Variables):
+#   MODRINTH_MOD_ID     the mod's Modrinth project ID or slug
+#   MODRINTH_PLUGIN_ID  the Folia plugin's Modrinth project ID or slug
+#   CURSEFORGE_MOD_ID   the mod's numeric CurseForge project ID
+#   BUKKIT_PLUGIN_ID    the plugin's numeric dev.bukkit.org project ID
+# A site whose ID variable is empty is skipped.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: An existing tag to publish, like v1.0.0 (versions already on Modrinth are skipped)
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    outputs:
+      tag: ${{ steps.check.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: refs/tags/${{ inputs.tag || github.ref_name }}
+      - id: check
+        run: python3 ci/release/publish.py check "${{ inputs.tag || github.ref_name }}"
+
+  test:
+    needs: check
+    uses: ./.github/workflows/ci.yml
+    with:
+      ref: refs/tags/${{ needs.check.outputs.tag }}
+
+  modrinth:
+    needs: [check, test]
+    if: ${{ vars.MODRINTH_MOD_ID != '' || vars.MODRINTH_PLUGIN_ID != '' }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: refs/tags/${{ needs.check.outputs.tag }}
+      # GitHub's artifact service sometimes answers 403 for a moment: one more try after a pause.
+      - id: jars
+        uses: actions/download-artifact@v5
+        continue-on-error: true
+        with:
+          pattern: jars-*
+          path: dist
+      - if: steps.jars.outcome == 'failure'
+        run: sleep 60
+      - if: steps.jars.outcome == 'failure'
+        uses: actions/download-artifact@v5
+        with:
+          pattern: jars-*
+          path: dist
+      - name: Upload to Modrinth
+        env:
+          MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
+          MODRINTH_MOD_ID: ${{ vars.MODRINTH_MOD_ID }}
+          MODRINTH_PLUGIN_ID: ${{ vars.MODRINTH_PLUGIN_ID }}
+        run: python3 ci/release/publish.py modrinth --jars dist --tag "${{ needs.check.outputs.tag }}"
+
+  curseforge:
+    needs: [check, test]
+    if: ${{ vars.CURSEFORGE_MOD_ID != '' || vars.BUKKIT_PLUGIN_ID != '' }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: refs/tags/${{ needs.check.outputs.tag }}
+      - id: jars
+        uses: actions/download-artifact@v5
+        continue-on-error: true
+        with:
+          pattern: jars-*
+          path: dist
+      - if: steps.jars.outcome == 'failure'
+        run: sleep 60
+      - if: steps.jars.outcome == 'failure'
+        uses: actions/download-artifact@v5
+        with:
+          pattern: jars-*
+          path: dist
+      # CurseForge cannot list what was uploaded, so a rerun after partial success uploads twice.
+      - name: Upload to CurseForge
+        env:
+          CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}
+          CURSEFORGE_MOD_ID: ${{ vars.CURSEFORGE_MOD_ID }}
+          BUKKIT_TOKEN: ${{ secrets.BUKKIT_TOKEN }}
+          BUKKIT_PLUGIN_ID: ${{ vars.BUKKIT_PLUGIN_ID }}
+        run: python3 ci/release/publish.py curseforge --jars dist --tag "${{ needs.check.outputs.tag }}"
