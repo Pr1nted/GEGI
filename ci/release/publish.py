@@ -273,23 +273,35 @@ def modrinth_environment(label, info, auth):
         fail(f"Modrinth still lists these versions without the {want} environment: {', '.join(missing)}")
     summary(f"- environment {want} on all {len(after)} versions ({changed} changed)")
     # The project page keeps its own answer too, and asks its owner to confirm it
-    # ("side_types_migration_review_status"). This is the same edit its Environment
-    # settings page makes when that answer is saved.
+    # ("side_types_migration_review_status"). Modrinth's checklist says whether that
+    # still matters; if it does, this makes the same edit as the project's Environment
+    # settings page, which needs a token with the "Write projects" scope.
     project = request("GET", f"{MODRINTH_API_V3}/project/{info['id']}", headers=auth) or {}
-    was = (project.get("environment"), project.get("side_types_migration_review_status"))
-    if was != ([want], "reviewed"):
-        request("PATCH", f"{MODRINTH_API_V3}/project/{info['id']}", headers=auth,
-                body=json.dumps({"environment": want, "side_types_migration_review_status": "reviewed"}).encode("utf-8"),
-                content_type="application/json")
-        summary(f"- project environment set to {want}, reviewed (was {was[0]}, {was[1]})")
-    else:
-        summary(f"- project environment already {want}, reviewed")
+    summary(f"- project environment {project.get('environment')}, "
+            f"review {project.get('side_types_migration_review_status')}")
+    nags = modrinth_checklist(info, auth)
+    if any("select_environment" in json.dumps(nag) for nag in nags):
+        try:
+            request("PATCH", f"{MODRINTH_API_V3}/project/{info['id']}", headers=auth,
+                    body=json.dumps({"environment": want, "side_types_migration_review_status": "reviewed"}).encode("utf-8"),
+                    content_type="application/json")
+        except HttpError as e:
+            if e.status in (401, 403):
+                fail("Modrinth's checklist still asks for an environment, and MODRINTH_TOKEN may not edit the project: "
+                     "give the token the \"Write projects\" scope, or pick the environment on the project's settings page")
+            raise
+        summary(f"- project environment set to {want}, reviewed")
+        nags = modrinth_checklist(info, auth)
+        if any("select_environment" in json.dumps(nag) for nag in nags):
+            fail("Modrinth's checklist still asks for an environment")
+    summary(f"- Modrinth checklist: no environment item left ({len(nags)} other items)")
+
+
+def modrinth_checklist(info, auth):
     nags = (request("GET", f"{MODRINTH_API_V3}/project/{info['id']}/validate", headers=auth) or {}).get("nags", [])
     for nag in nags:
         summary(f"- Modrinth checklist: {json.dumps(nag, sort_keys=True)}")
-    if any("select_environment" in json.dumps(nag) for nag in nags):
-        fail("Modrinth's checklist still asks for an environment")
-    summary(f"- Modrinth checklist: no environment item left ({len(nags)} other items)")
+    return nags
 
 
 def modrinth(uploads, tag, version):
